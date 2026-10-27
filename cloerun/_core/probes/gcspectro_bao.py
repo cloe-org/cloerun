@@ -8,8 +8,8 @@ from euclidlib.le3.bao_gc import BAO_alphas, BAO_alphas_covariance
 
 from cloelike.EuclidLikelihood_GCspectro_BAO import EuclidLikelihood_GCspectro_BAO
 
-from cloechain.config import RunConfig
-from cloechain.loader import load_background, load_perturbations
+from cloerun._core.config import RunConfig
+from cloerun._core.loader import load_background, load_perturbations
 
 _BACKGROUND_PACKAGES = {
     "CAMB": "camb",
@@ -102,7 +102,7 @@ def loglike(likelihood: EuclidLikelihood_GCspectro_BAO, parameters: dict[str, An
         An instance of the likelihood.
     parameters: dict[str, Any]
         Full parameter dictionary in the format returned by
-        `cloechain.parameters.build_parameter_dict_for_loglike`.
+        `cloerun._core.parameters.build_parameter_dict_for_loglike`.
 
     Returns
     -------

@@ -7,14 +7,14 @@ import importlib
 from typing import Any
 
 PROBES: dict[str, str] = {
-    "GCspectro_Pls": "cloechain.probes.gcspectro_pls",
-    "GCspectro_BAO": "cloechain.probes.gcspectro_bao",
-    "GCspectro_Pls_BAO": "cloechain.probes.gcspectro_pls_bao",
-    "WL": "cloechain.probes.photo_cls",
-    "GCph": "cloechain.probes.photo_cls",
-    "GGL": "cloechain.probes.photo_cls",
-    "2x2pt": "cloechain.probes.photo_cls",
-    "3x2pt": "cloechain.probes.photo_cls",
+    "GCspectro_Pls": "cloerun._core.probes.gcspectro_pls",
+    "GCspectro_BAO": "cloerun._core.probes.gcspectro_bao",
+    "GCspectro_Pls_BAO": "cloerun._core.probes.gcspectro_pls_bao",
+    "WL": "cloerun._core.probes.photo_cls",
+    "GCph": "cloerun._core.probes.photo_cls",
+    "GGL": "cloerun._core.probes.photo_cls",
+    "2x2pt": "cloerun._core.probes.photo_cls",
+    "3x2pt": "cloerun._core.probes.photo_cls",
 }
 
 # Probes whose config uses the photometric `data` layout (n(z), angular power
@@ -22,34 +22,34 @@ PROBES: dict[str, str] = {
 PHOTO_PROBES = frozenset({"WL", "GCph", "GGL", "2x2pt", "3x2pt"})
 
 SAMPLERS: dict[str, str] = {
-    "nautilus": "cloechain.samplers.nautilus_runner",
+    "nautilus": "cloerun._core.samplers.nautilus_runner",
 }
 
 CONSTRAINTS: dict[str, str] = {
-    "negative_w0_wa_sum": "cloechain.constraints:w0_wa_negative",
+    "negative_w0_wa_sum": "cloerun._core.constraints:w0_wa_negative",
 }
 
 DERIVED_PARAMETERS: dict[str, dict[str, str]] = {
     "bG2_coevolution": {
-        "path": "cloechain.derived_parameters:bG2_coevolution",
+        "path": "cloerun._core.derived_parameters:bG2_coevolution",
     },
     "bG2_excursion_set": {
-        "path": "cloechain.derived_parameters:bG2_excursion_set",
+        "path": "cloerun._core.derived_parameters:bG2_excursion_set",
     },
     "bGam3_coevolution": {
-        "path": "cloechain.derived_parameters:bGam3_coevolution",
+        "path": "cloerun._core.derived_parameters:bGam3_coevolution",
     },
     "H0_from_h": {
-        "path": "cloechain.derived_parameters:H0_from_h", "trigger": "h",
+        "path": "cloerun._core.derived_parameters:H0_from_h", "trigger": "h",
     },
     "Omega_cdm0_from_omch2": {
-        "path": "cloechain.derived_parameters:Omega_cdm0_from_omch2", "trigger": "omch2",
+        "path": "cloerun._core.derived_parameters:Omega_cdm0_from_omch2", "trigger": "omch2",
     },
     "Omega_b0_from_ombh2": {
-        "path": "cloechain.derived_parameters:Omega_b0_from_ombh2", "trigger": "ombh2",
+        "path": "cloerun._core.derived_parameters:Omega_b0_from_ombh2", "trigger": "ombh2",
     },
     "As_from_logA": {
-        "path": "cloechain.derived_parameters:As_from_logA", "trigger": "logA",
+        "path": "cloerun._core.derived_parameters:As_from_logA", "trigger": "logA",
     },
 }
 

@@ -11,7 +11,7 @@ import yaml
 
 # Checked packages, always
 TRACKED_PACKAGES = (
-    "numpy", "scipy", "cloelib", "euclidlib", "cloelike", "cloechain",
+    "numpy", "scipy", "cloelib", "euclidlib", "cloelike", "cloerun",
 )
 
 
@@ -21,7 +21,7 @@ def software_versions(extra_packages: Iterable[str] = ()) -> dict[str, str]:
     Parameters
     ----------
     extra_packages: Iterable[str]
-        Specific package(s) that a cloechain run actually depends on (e.g.
+        Specific package(s) that a cloerun run actually depends on (e.g.
         ``camb``, ``comet-emu``), on top of the packages always tracked
         in TRACKED_PACKAGES.
 

@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from cloechain.priors import ParameterLayout
+from cloerun._core.priors import ParameterLayout
 
 
 def build_parameter_dict_for_loglike(

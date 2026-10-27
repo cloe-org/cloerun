@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "cloechain"
+name = "cloerun"
 version = "0.1.0"
-description = "YAML-driven configuration and sampler runner for cloelike likelihoods"
+description = "Run Euclid inference campaigns (synthetic data, chains, analysis) with cloelike likelihoods"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -15,8 +15,21 @@ dependencies = [
     "nautilus-sampler",
 ]
 
+[project.scripts]
+cloerun = "cloerun.__main__:main"
+
 [project.optional-dependencies]
 test = ["pytest"]
+analyse = ["getdist", "matplotlib"]
+# The cloe-org releases cloerun is tested with.
+cloe = [
+    "cloelib @ git+https://github.com/cloe-org/cloelib.git@v0.11",
+    "cloelike @ git+https://github.com/cloe-org/cloelike.git@v0.3",
+]
+
+[tool.hatch.metadata]
+# For the git releases of the `cloe` extra.
+allow-direct-references = true
 
 [tool.pytest.ini_options]
 addopts = "--verbose"
