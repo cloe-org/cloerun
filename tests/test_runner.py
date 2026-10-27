@@ -102,3 +102,19 @@ def test_no_data_vector(tmp_path):
     config.data.cells = None
     with pytest.raises(ValueError, match="No data vector"):
         test_loglike(config)
+
+
+def test_test_loglike_uses_prior_median_without_fiducial(tmp_path, capsys):
+    config = _config(tmp_path)
+    config.fiducial_parameters = {}
+    # The median of the flat prior on a is 0, the data 0.3.
+    assert test_loglike(config) == pytest.approx(-0.5 * 0.3**2 / 0.1**2)
+    assert "prior median used for: ['a', 'omch2']" in capsys.readouterr().out
+
+
+def test_sdv_needs_a_probe_that_writes_spectra(tmp_path, monkeypatch):
+    import toy_probe
+
+    monkeypatch.delattr(toy_probe, "theory_spectra")
+    with pytest.raises(ValueError, match="cannot write a synthetic data vector"):
+        write_sdv(_config(tmp_path))

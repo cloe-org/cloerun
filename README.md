@@ -90,11 +90,14 @@ cloerun sdv      campaign.yaml --run sdv_WL_fiducial                # synthetic 
 cloerun chain    campaign.yaml --run chain_WL_baseline --test       # one loglike at the fiducial
 cloerun chain    campaign.yaml --run chain_WL_baseline              # sample
 cloerun analyse  campaign.yaml --run chain_WL_baseline --params omch2 H0 S8
+cloerun chain    examples/gcspectro_pls_nautilus.yaml                # a spectroscopic chain
 ```
 
 Every command takes a campaign file, a single pipeline config, or a cloerun
 config (see [cloerun configs](#cloerun-configs)), and `--run NAME` (repeat for
-several) to select runs. `cloerun <command> --help` lists the options;
+several) to select runs. `--test` evaluates the log-likelihood at the
+fiducial values of the config, and at the prior median of the sampled
+parameters without one. `cloerun <command> --help` lists the options;
 `python -m cloerun` works as well.
 
 From Python:
@@ -110,8 +113,11 @@ for name, config, mode in load_runs("campaign.yaml", ["chain_WL_baseline"]):
 
 ## Campaigns
 
-A campaign file lists runs, each built from a pipeline config (`base`) or
-from another run (`parent`), and modified by named `components`:
+A campaign file lists runs, each built from a config (`base`) or from
+another run (`parent`), and modified by named `components`. A `base` is a
+[pipeline config](#pipeline-configs) (the photometric DR1 runs) or a
+[cloerun config](#cloerun-configs) (any probe, including the spectroscopic
+ones):
 
 ```yaml
 output_dir: /path/to/output/directory
@@ -129,10 +135,38 @@ components:
 ```
 
 Each key of a component is merged where that key is in the config: at the
-top level (`run`, `modelling`, `inference`), else at the one place it appears
-(`scale_cuts`, `data_vector`, a parameter such as `w0`, ...). A dotted key
+top level (`run`, `modelling`, `inference`; `probe`, `data`, `sampler`, ...
+of a cloerun config), else at the one place it appears (`scale_cuts`,
+`data_vector`, a parameter such as `w0`, ...). A dotted key
 (`modelling.coupling.mode`) gives the place explicitly, which is needed for
 keys that appear in several places (`mode`, `file`, ...).
+
+A spectroscopic campaign, from the examples:
+
+```yaml
+output_dir: chains
+output_name: spectro_campaign
+runs:
+  - name: bao_baseline
+    base: examples/gcspectro_bao_nautilus.yaml
+    components: [checkpoints]
+  - name: bao_tight_bbn          # same run, tighter BBN prior
+    parent: bao_baseline
+    components: [tight_bbn]
+  - name: pls_eft
+    base: examples/gcspectro_pls_nautilus.yaml
+components:
+  checkpoints:
+    sampler.settings:
+      filepath: ${output_dir}/${name}.hdf5
+  tight_bbn:
+    ombh2: {dist: norm, loc: 0.0219961, scale: 0.0001}
+```
+
+The outputs of a run built from a cloerun config go to the campaign's
+`${output_dir}`, named after the run; its other settings are kept. Such runs
+are chains (`cloerun chain --test` evaluates one loglike); `cloerun sdv` only
+supports the photometric probes.
 
 Strings may use `${name}` (the run), `${output_dir}`
 (`<output_dir>/<output_name>`, where the outputs of the runs are written) and
@@ -205,6 +239,21 @@ curl -LO https://zenodo.org/records/19071608/files/covmat_2D.npz
 cd - && cloerun chain examples/wl_nautilus.yaml
 ```
 
+For the spectroscopic examples (about 40 MB):
+
+```bash
+mkdir -p ../data && cd ../data
+for record in 18711304 19729182 21219969; do
+  curl -s https://zenodo.org/api/records/$record \
+    | python -c "import json, sys; [print(f['key'], f['links']['self']) for f in json.load(sys.stdin)['files']]" \
+    | while read -r name url; do curl -sL -o "$name" "$url"; done
+done
+cd - && cloerun chain examples/gcspectro_bao_nautilus.yaml
+```
+
+The spectroscopic examples need `COMET` (`comet-emu`) for the multipoles, or
+`PBJ` (`pbjcosmo`) with `spectro_power.code: PBJ`.
+
 In the photometric configs:
 
 - **`probe`** picks the theory model: `background`, `linear_perturbations`
@@ -275,4 +324,4 @@ pytest
 
 ## Example output
 
-![Example posterior](example_posterior.png)
+![Example posterior](docs/example_posterior.png)

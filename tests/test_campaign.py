@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from cloerun.campaign import apply_component, load_campaign, main
+from cloerun.campaign import apply_component, load_campaign, load_runs, main
 
 
 def _config():
@@ -165,3 +165,31 @@ def test_load_runs_native_config():
     ((name, config, mode),) = load_runs(examples / "wl_nautilus.yaml")
     assert (name, mode) == ("test_wl_NLA_HMcode", "chain")
     assert config.probe["kind"] == "WL"
+
+
+def test_cloerun_config_as_base(tmp_path):
+    examples = Path(__file__).parents[1] / "examples"
+    (tmp_path / "bao.yaml").write_text((examples / "gcspectro_bao_nautilus.yaml").read_text())
+    path = tmp_path / "campaign.yaml"
+    path.write_text(yaml.safe_dump({
+        "output_dir": "out", "output_name": "spectro",
+        "runs": [
+            {"name": "bao", "base": "bao.yaml", "components": ["checkpoint"]},
+            {"name": "bao_bbn", "parent": "bao", "components": ["bbn"]},
+        ],
+        "components": {
+            "checkpoint": {"sampler.settings": {"filepath": "${output_dir}/${name}.hdf5"}},
+            "bbn": {"ombh2": {"dist": "norm", "loc": 0.022, "scale": 0.0001}},
+        },
+    }))
+    runs = {name: (config, mode) for name, config, mode in load_runs(path)}
+    config, mode = runs["bao_bbn"]
+    output_dir = str(tmp_path / "out" / "spectro")
+    assert mode == "chain"
+    assert config.probe["kind"] == "GCspectro_BAO"
+    assert config.output == {"directory": output_dir, "name": "bao_bbn"}
+    assert config.sampler["settings"]["filepath"] == f"{output_dir}/bao_bbn.hdf5"
+    assert config.sampled_parameters["ombh2"]["scale"] == 0.0001
+    assert runs["bao"][0].sampled_parameters["ombh2"]["scale"] == 0.00038
+    # Data paths stay relative to the base config.
+    assert config.data.covariance_template == str(tmp_path / "../data/EUC_LE3_BAO_COV_Z{}.fits")

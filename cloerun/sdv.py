@@ -30,6 +30,11 @@ def write_sdv(config: RunConfig) -> Path:
         The written file.
     """
     setup = prepare(config)
+    if not hasattr(setup.probe, "theory_spectra"):
+        raise ValueError(
+            f"Probe '{config.probe['kind']}' cannot write a synthetic data vector; "
+            "only the photometric probes can"
+        )
     path = Path(config.output["sdv_file"])
     path.parent.mkdir(parents=True, exist_ok=True)
     spectra = setup.probe.theory_spectra(setup.likelihood, config, setup.fiducial)

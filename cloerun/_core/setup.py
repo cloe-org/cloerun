@@ -210,6 +210,32 @@ class Setup:
         )
         return loglike, priors
 
+    def test_point(self, loglike: LogLikelihood, priors: Priors) -> dict[str, Any]:
+        """Full parameter dictionary of one sampler point at the fiducial:
+        each sampled parameter takes its fiducial value where the config
+        gives one, and its prior median otherwise. The point goes through
+        the same layout and derived relations as the sampler's.
+
+        Parameters
+        ----------
+        loglike: LogLikelihood
+            Output of `loglikelihood`.
+        priors: Priors
+            Output of `loglikelihood`.
+
+        Returns
+        -------
+        parameters: dict[str, Any]
+        """
+        flat_sample = {
+            name: self.fiducial_parameters.get(name, float(dist.median()))
+            for name, dist in priors.distributions.items()
+        }
+        medians = [name for name in flat_sample if name not in self.fiducial_parameters]
+        if medians:
+            print(f"No fiducial value given, prior median used for: {medians}")
+        return loglike.parameters(flat_sample)
+
 
 def prepare(config: RunConfig) -> Setup:
     """Build the likelihood of a run and resolve its parameters.

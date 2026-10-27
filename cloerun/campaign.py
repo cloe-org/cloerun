@@ -1,9 +1,10 @@
 """Campaigns: sets of runs sharing a baseline, run with
 ``cloerun campaign campaign.yaml``.
 
-A campaign file lists the runs, each either built from a pipeline config
-(``base``, see `cloerun._core.pipeline`) or from another run (``parent``), and
-modified by ``components``::
+A campaign file lists the runs, each either built from a config (``base``: a
+pipeline config, see `cloerun._core.pipeline`, or a cloerun config such as
+the spectroscopic ones of ``examples/``) or from another run (``parent``),
+and modified by ``components``::
 
     output_dir:  /path/to/output/directory
     output_name: campaign_scalecuts
@@ -18,7 +19,8 @@ modified by ``components``::
         w0: -3.0 -1.0 -0.33
 
 Each key of a component is merged into the config where that key is: at the
-top level (``run``, ``modelling``, ``inference``), else at the one place in
+top level (``run``, ``modelling``, ``inference``; ``probe``, ``data``, ... of
+a cloerun config), else at the one place in
 the config, parameters included, where it appears (``scale_cuts``, ``w0``,
 ...). A dotted key (``inference.likelihood.covariance_key``) gives the place
 explicitly; it is needed when the key appears in several places (``mode``,
@@ -83,9 +85,21 @@ class CampaignRun:
         config: RunConfig
         mode: str
         """
-        raw, mode = to_run_config(
-            self.config, self.config_dir, self.name, self.output_dir, mode
-        )
+        if "probe" in self.config:
+            # A cloerun config (e.g. a spectroscopic run): only the outputs
+            # move to the campaign's.
+            raw = {
+                **self.config,
+                "output": {
+                    **self.config.get("output", {}),
+                    "directory": self.output_dir, "name": self.name,
+                },
+            }
+            mode = mode or "chain"
+        else:
+            raw, mode = to_run_config(
+                self.config, self.config_dir, self.name, self.output_dir, mode
+            )
         return RunConfig.from_dict(raw, self.config_dir, label=self.name), mode
 
 

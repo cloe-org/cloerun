@@ -62,7 +62,8 @@ def run_chain(config: RunConfig) -> Chain:
 
 
 def test_loglike(config: RunConfig) -> float:
-    """Evaluate the log-likelihood of a run once, at its fiducial point.
+    """Evaluate the log-likelihood of a run once, at its fiducial point
+    (prior medians for the sampled parameters without a fiducial value).
 
     Parameters
     ----------
@@ -74,9 +75,10 @@ def test_loglike(config: RunConfig) -> float:
     loglike: float
     """
     setup = prepare(config)
-    loglike, _ = setup.loglikelihood()
+    loglike, priors = setup.loglikelihood()
+    point = setup.test_point(loglike, priors)
     start = time.perf_counter()
-    value = float(setup.probe.loglike(loglike.likelihood, setup.fiducial))
+    value = float(setup.probe.loglike(loglike.likelihood, point))
     print(f"loglike at the fiducial point: {value:.6g} ({time.perf_counter() - start:.2f} s)")
     return value
 
