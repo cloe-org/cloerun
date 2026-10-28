@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # The tests need no theory code (CAMB, emulators): cloelike v0.3 and
+      # cloelib v0.11 from the `cloe` extra, euclidlib for the photometric
+      # probes and getdist for the analysis.
+      - name: Install cloerun
+        run: pip install -e ".[test,analyse,cloe]" euclidlib
+
+      - name: Run tests
+        run: pytest -vv

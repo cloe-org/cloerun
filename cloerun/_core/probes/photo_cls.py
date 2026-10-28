@@ -21,8 +21,8 @@ from cloelike.EuclidLikelihood_photo_Cls import (
     EuclidLikelihood_WL,
 )
 
-from cloechain.config import PHOTO_BLOCKS, RunConfig
-from cloechain.loader import (
+from cloerun._core.config import PHOTO_BLOCKS, RunConfig
+from cloerun._core.loader import (
     load_background,
     load_nonlinear_perturbations,
     load_perturbations,
@@ -62,7 +62,7 @@ _PERTURBATIONS_PACKAGES = {
 def obs_labels(cfg: RunConfig) -> list[str]:
     """Observable bin labels, used to lay out per-redshift nuisance
     parameters. The photometric likelihoods take one scalar parameter per
-    tomographic bin instead (see `cloechain.templates`), so there are none.
+    tomographic bin instead (see `cloerun._core.templates`), so there are none.
 
     Parameters
     ----------
@@ -84,7 +84,9 @@ def _load_nz(path: str, z_grid: np.ndarray) -> np.ndarray:
     Parameters
     ----------
     path: str
-        Path of the n(z) file.
+        Path of the n(z) file: a FITS file read by `euclidlib`, or a text
+        table with the redshift in the first column and one column per bin
+        (e.g. the ``nz_shear.txt`` written by Spaceborne).
     z_grid: np.ndarray
         Redshift grid to resample on.
 
@@ -93,10 +95,96 @@ def _load_nz(path: str, z_grid: np.ndarray) -> np.ndarray:
     nz: np.ndarray
         Array of shape ``(n_bins, len(z_grid))``.
     """
-    z, nz = el.phz.redshift_distributions(path)
-    return np.array(
-        [np.interp(z_grid, z, nz[b] / trapezoid(nz[b], z)) for b in sorted(nz)]
+    if Path(path).suffix.lower() in (".fits", ".fit", ".fz"):
+        z, nz = el.phz.redshift_distributions(path)
+        nz = [nz[b] for b in sorted(nz)]
+    else:
+        table = np.loadtxt(path)
+        z, nz = table[:, 0], list(table[:, 1:].T)
+    return np.array([np.interp(z_grid, z, n / trapezoid(n, z)) for n in nz])
+
+
+def binning_ells(spec: dict[str, Any]) -> np.ndarray:
+    """Multipoles of the data vector, from the ``data.ells`` binning.
+
+    Parameters
+    ----------
+    spec: dict[str, Any]
+        ``kind``: ``linear``, ``log`` or ``sqrt``, with ``ell_min``,
+        ``ell_max`` and ``N_ell``, giving the centre of ``N_ell`` bins with
+        edges uniform in ell, log(ell) or sqrt(ell); or ``fromfile``, with
+        ``file``, a text table whose first column holds the multipoles
+        (e.g. the ``ell_values.txt`` written by Spaceborne).
+
+    Returns
+    -------
+    ells: np.ndarray
+    """
+    kind = spec.get("kind", "log")
+    if kind == "fromfile":
+        return np.atleast_2d(np.loadtxt(spec["file"]).T)[0]
+    spacings = {
+        "linear": (lambda x: x, lambda x: x),
+        "log": (np.log, np.exp),
+        "sqrt": (np.sqrt, np.square),
+    }
+    if kind not in spacings:
+        raise ValueError(
+            f"Unknown 'ells.kind' '{kind}'; expected one of {[*spacings, 'fromfile']}"
+        )
+    forward, inverse = spacings[kind]
+    edges = inverse(
+        np.linspace(forward(spec["ell_min"]), forward(spec["ell_max"]), int(spec["N_ell"]) + 1)
     )
+    return 0.5 * (edges[:-1] + edges[1:])
+
+
+def _data_keys(kind: str, n_pos: int, n_she: int) -> list[tuple]:
+    """Keys of every spectrum of the probe, as `cloelike` reads them.
+
+    Parameters
+    ----------
+    kind: str
+        Probe kind.
+    n_pos: int
+        Number of positions bins.
+    n_she: int
+        Number of shear bins.
+
+    Returns
+    -------
+    keys: list[tuple]
+    """
+    pairs = {
+        "WL": [(i, j) for i in range(1, n_she + 1) for j in range(i, n_she + 1)],
+        "GGL": [(i, j) for i in range(1, n_pos + 1) for j in range(1, n_she + 1)],
+        "GCph": [(i, j) for i in range(1, n_pos + 1) for j in range(i, n_pos + 1)],
+    }
+    return [(*PHOTO_BLOCKS[block], i, j) for block in _BLOCKS[kind] for i, j in pairs[block]]
+
+
+def _template_cells(kind: str, n_pos: int, n_she: int, n_ell: int) -> dict[tuple, np.ndarray]:
+    """Zero spectra with the keys and shapes `cloelike` reads, standing for
+    the data when the data vector is the theory at the fiducial.
+
+    Parameters
+    ----------
+    kind: str
+        Probe kind.
+    n_pos: int
+        Number of positions bins.
+    n_she: int
+        Number of shear bins.
+    n_ell: int
+        Number of multipoles per spectrum.
+
+    Returns
+    -------
+    cells: dict[tuple, np.ndarray]
+    """
+    # Spin-2 fields carry an E/B axis: (E, B) x (E, B) for WL, (E, B) for GGL.
+    shapes = {("SHE", "SHE"): (1, 1, n_ell), ("POS", "SHE"): (1, n_ell), ("POS", "POS"): (n_ell,)}
+    return {key: np.zeros(shapes[key[:2]]) for key in _data_keys(kind, n_pos, n_she)}
 
 
 def _block_sizes(n_pos: int, n_she: int, n_ell: int) -> dict[str, int]:
@@ -215,11 +303,15 @@ def _build_scale_cuts(cfg: RunConfig, cells: dict) -> dict[tuple, list[float]]:
     unknown = [key for key in overrides if key not in cells]
     if unknown:
         raise ValueError(f"'scale_cuts.overrides' has pairs not in the data: {unknown}")
-    return {
+    scale_cuts = {
         key: overrides.get(key, cfg.scale_cuts[prefixes[key[:2]]])
         for key in cells
         if key[:2] in prefixes
     }
+    uncut = ["-".join(map(str, key)) for key, bounds in scale_cuts.items() if bounds is None]
+    if uncut:
+        raise ValueError(f"'scale_cuts' gives no multipole range for {uncut}")
+    return scale_cuts
 
 
 def _build_settings(cfg: RunConfig, scale_cuts: dict) -> dict[str, Any]:
@@ -276,9 +368,14 @@ def build_likelihood(cfg: RunConfig):
     dndz_pos = _load_nz(data_cfg.nz_positions, z_grid)
     dndz_she = _load_nz(data_cfg.nz_shear, z_grid)
 
-    cells = el.le3.pk_wl.angular_power_spectra(data_cfg.cells)
-    scale_cuts = _build_scale_cuts(cfg, cells)
-    ells = np.asarray(cells[next(iter(scale_cuts))].ell)
+    if data_cfg.cells is not None:
+        cells = el.le3.pk_wl.angular_power_spectra(data_cfg.cells)
+        scale_cuts = _build_scale_cuts(cfg, cells)
+        ells = np.asarray(cells[next(iter(scale_cuts))].ell)
+    else:
+        ells = binning_ells(data_cfg.ells)
+        cells = _template_cells(kind, dndz_pos.shape[0], dndz_she.shape[0], len(ells))
+        scale_cuts = _build_scale_cuts(cfg, cells)
 
     sizes = _block_sizes(dndz_pos.shape[0], dndz_she.shape[0], len(ells))
     covariance = _select_covariance(
@@ -312,7 +409,7 @@ def build_likelihood(cfg: RunConfig):
 
 def parameter_names(likelihood) -> list[str]:
     """Every parameter name the likelihood reads, used to expand the ``{i}``
-    templates of the config (see `cloechain.templates`).
+    templates of the config (see `cloerun._core.templates`).
 
     Parameters
     ----------
@@ -333,7 +430,7 @@ def parameter_names(likelihood) -> list[str]:
     return list(dict.fromkeys(names))
 
 
-def use_noise_free_mock(likelihood, fiducial: dict[str, Any]) -> None:
+def use_noise_free_mock(likelihood, fiducial: dict[str, Any]) -> np.ndarray:
     """Replace the data vector with the theory at ``fiducial``, so that the
     posterior is centred on it whatever model generated the data file.
 
@@ -343,9 +440,100 @@ def use_noise_free_mock(likelihood, fiducial: dict[str, Any]) -> None:
         A likelihood instance built by `build_likelihood`.
     fiducial: dict[str, Any]
         Full parameter dictionary of the fiducial point.
+
+    Returns
+    -------
+    theory: np.ndarray
+        The masked theory vector now used as data vector, to pass to
+        `set_data_vector_masked` for a copy of the likelihood.
     """
     theory = np.asarray(likelihood.get_theory_vector_masked(fiducial))
-    likelihood.get_data_vector_masked = lambda: theory
+    set_data_vector_masked(likelihood, theory)
+    return theory
+
+
+def set_data_vector_masked(likelihood, vector: np.ndarray) -> None:
+    """Replace the masked data vector of the likelihood with ``vector``.
+
+    Parameters
+    ----------
+    likelihood: EuclidLikelihood_WL, _GCph, _GGL, _2x2pt or _3x2pt
+        A likelihood instance built by `build_likelihood`.
+    vector: np.ndarray
+        Masked data vector.
+    """
+    likelihood.get_data_vector_masked = lambda: vector
+
+
+def theory_spectra(likelihood, cfg: RunConfig, parameters: dict[str, Any]) -> dict:
+    """Theory spectra of the probe at ``parameters``, keyed as the data, to
+    write a synthetic data vector with `euclidlib`.
+
+    Parameters
+    ----------
+    likelihood: EuclidLikelihood_WL, _GCph, _GGL, _2x2pt or _3x2pt
+        A likelihood instance built by `build_likelihood`.
+    cfg: RunConfig
+        The run's parsed configuration.
+    parameters: dict[str, Any]
+        Full parameter dictionary.
+
+    Returns
+    -------
+    spectra: dict[tuple, cosmolib.data.AngularPowerSpectrum]
+    """
+    likelihood.get_theory_vector_full(parameters)
+    keys = likelihood.data["cells"].keys()
+    return {key: likelihood.theory_prediction[key] for key in keys}
+
+
+def write_spectra(path: str, spectra: dict) -> None:
+    """Write spectra returned by `theory_spectra` to a FITS file, readable
+    as ``data.cells``.
+
+    Parameters
+    ----------
+    path: str
+        Output FITS file.
+    spectra: dict
+        Output of `theory_spectra`.
+    """
+    el.le3.pk_wl.angular_power_spectra.write(path, spectra)
+
+
+DERIVED_OUTPUTS = ("sigma8_0", "S8")
+
+
+def derived_outputs(likelihood, parameters: dict[str, Any], names: list[str]) -> list[float]:
+    """Derived quantities at ``parameters``, after the likelihood was
+    evaluated there.
+
+    Parameters
+    ----------
+    likelihood: EuclidLikelihood_WL, _GCph, _GGL, _2x2pt or _3x2pt
+        A likelihood instance built by `build_likelihood`.
+    parameters: dict[str, Any]
+        Full parameter dictionary.
+    names: list[str]
+        Requested quantities, any of `DERIVED_OUTPUTS`.
+
+    Returns
+    -------
+    values: list[float]
+    """
+    unknown = [name for name in names if name not in DERIVED_OUTPUTS]
+    if unknown:
+        raise ValueError(
+            f"Unknown 'derived_outputs' {unknown}; available: {list(DERIVED_OUTPUTS)}"
+        )
+    # Cached by cloelike: no new computation for the point just evaluated.
+    background, _, _ = likelihood._get_perturbations(parameters)
+    sigma8_0 = float(likelihood.derived["sigma8_0"])
+    values = {
+        "sigma8_0": sigma8_0,
+        "S8": sigma8_0 * float(np.sqrt(background.Omega_m(0.0) / 0.3)),
+    }
+    return [values[name] for name in names]
 
 
 def loglike(likelihood, parameters: dict[str, Any]) -> float:
@@ -357,7 +545,7 @@ def loglike(likelihood, parameters: dict[str, Any]) -> float:
         An instance of the likelihood.
     parameters: dict[str, Any]
         Full parameter dictionary in the format returned by
-        `cloechain.parameters.build_parameter_dict_for_loglike`.
+        `cloerun._core.parameters.build_parameter_dict_for_loglike`.
 
     Returns
     -------

@@ -1,4 +1,4 @@
-"""Main reader for a cloechain config yaml file."""
+"""Main reader for a cloerun config yaml file."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Any, Optional
 
 import yaml
 
-from cloechain.loader import DERIVED_PARAMETERS, PHOTO_PROBES
+from cloerun._core.loader import DERIVED_PARAMETERS, PHOTO_PROBES
 
 REQUIRED_SECTIONS = (
     "probe", "data", "fixed_parameters", "sampled_parameters", "sampler", "output",
@@ -95,7 +95,9 @@ def _parse_photo_scale_cuts(scale_cuts: dict[str, Any]) -> dict[str, Any]:
     scale_cuts: dict[str, Any]
         The raw ``scale_cuts`` section of a config yaml file, with one
         multipole range per block (``WL``, ``GGL``, ``GCph``) and optional
-        per-pair ranges under ``overrides``, keyed as ``"POS-SHE-1-3"``.
+        per-pair ranges under ``overrides``, keyed as ``"POS-SHE-1-3"``. A
+        block range may be ``null`` if ``overrides`` covers every spectrum
+        of the block.
 
     Returns
     -------
@@ -109,7 +111,10 @@ def _parse_photo_scale_cuts(scale_cuts: dict[str, Any]) -> dict[str, Any]:
             f"Unexpected 'scale_cuts' key(s) {unexpected}; expected any of "
             f"{sorted(PHOTO_BLOCKS)} and 'overrides'"
         )
-    parsed = {block: list(bounds) for block, bounds in scale_cuts.items() if block != "overrides"}
+    parsed = {
+        block: None if bounds is None else list(bounds)
+        for block, bounds in scale_cuts.items() if block != "overrides"
+    }
     overrides = {}
     for pair, bounds in scale_cuts.get("overrides", {}).items():
         parts = str(pair).split("-")
@@ -294,8 +299,10 @@ class PhotoDataConfig:
     z_grid: dict[str, float]
         ``min``, ``max`` and ``num`` of the uniform redshift grid the n(z)
         are resampled on, which is also the grid of the theory calculation.
-    cells: str
-        Path of the angular power spectra file.
+    cells: str or None
+        Path of the angular power spectra file, or ``None`` with
+        ``noise_free_mock: true``: the data vector is then the theory at the
+        fiducial, on the multipoles given by ``ells``.
     covariance: str
         Path of the covariance file (``.npz`` or ``.npy``). It covers either
         exactly the blocks of the probe, or the full 3x2pt data vector, in
@@ -308,16 +315,20 @@ class PhotoDataConfig:
     noise_free_mock: bool
         Whether to replace the data vector with the theory at
         ``fixed_parameters``.
+    ells: dict[str, Any] or None
+        Multipole binning used when there is no ``cells`` file, see
+        `cloerun._core.probes.photo_cls.binning_ells`.
     """
 
     nz_positions: str
     nz_shear: str
     z_grid: dict[str, float]
-    cells: str
+    cells: Optional[str]
     covariance: str
     covariance_key: Optional[str] = None
     mixing: Optional[str] = None
     noise_free_mock: bool = False
+    ells: Optional[dict[str, Any]] = None
 
     @classmethod
     def from_dict(cls, data: dict, config_dir: Path) -> PhotoDataConfig:
@@ -335,9 +346,10 @@ class PhotoDataConfig:
         -------
         data_config: PhotoDataConfig
         """
-        for key in ("cells", "covariance"):
-            if key not in data:
-                raise ValueError(f"'data' section is missing required key '{key}'")
+        if "covariance" not in data:
+            raise ValueError("'data' section is missing required key 'covariance'")
+        if "cells" not in data and "ells" not in data:
+            raise ValueError("'data' section needs 'cells', or 'ells' to build the data vector")
         nz_positions = data.get("nz_positions", data.get("nz"))
         nz_shear = data.get("nz_shear", data.get("nz"))
         if nz_positions is None or nz_shear is None:
@@ -348,16 +360,20 @@ class PhotoDataConfig:
 
         base_directory = config_dir / data.get("base_directory", ".")
         z_grid = {"min": 1e-4, "max": 3.0, "num": 100, **data.get("z_grid", {})}
+        ells = dict(data["ells"]) if "ells" in data else None
+        if ells is not None and "file" in ells:
+            ells["file"] = str(base_directory / ells["file"])
 
         return cls(
             nz_positions=str(base_directory / nz_positions),
             nz_shear=str(base_directory / nz_shear),
             z_grid=z_grid,
-            cells=str(base_directory / data["cells"]),
+            cells=str(base_directory / data["cells"]) if "cells" in data else None,
             covariance=str(base_directory / data["covariance"]),
             covariance_key=data.get("covariance_key"),
             mixing=str(base_directory / data["mixing"]) if "mixing" in data else None,
             noise_free_mock=bool(data.get("noise_free_mock", False)),
+            ells=ells,
         )
 
 
@@ -394,6 +410,17 @@ class RunConfig:
         The raw ``constraints`` section of the config yaml file.
     derived_parameters: dict[str, bool]
         The ``derived_parameters`` section of the config yaml file.
+    derived_outputs: list[str]
+        The ``derived_outputs`` section: quantities computed at each sample
+        and stored as extra chain columns (photometric probes:
+        ``sigma8_0``, ``S8``).
+    fiducial_parameters: dict[str, Any]
+        The ``fiducial_parameters`` section: values of the sampled parameters
+        at the fiducial point, used with ``fixed_parameters`` by the ``sdv``
+        and ``test`` modes.
+    prune_parameters: bool
+        Whether to drop the parameters the likelihood does not read, instead
+        of failing on them -- for parameter files shared by several probes.
     """
 
     probe: dict[str, Any]
@@ -406,6 +433,9 @@ class RunConfig:
     raw_text: str
     constraints: dict[str, bool] = field(default_factory=dict)
     derived_parameters: dict[str, bool] = field(default_factory=dict)
+    derived_outputs: list[str] = field(default_factory=list)
+    fiducial_parameters: dict[str, Any] = field(default_factory=dict)
+    prune_parameters: bool = False
 
     @classmethod
     def from_yaml(cls, path: str) -> RunConfig:
@@ -423,12 +453,41 @@ class RunConfig:
         """
         config_path = Path(path).resolve()
         raw_text = config_path.read_text()
-        raw = yaml.safe_load(raw_text)
+        return cls.from_dict(
+            yaml.safe_load(raw_text), config_dir=config_path.parent,
+            raw_text=raw_text, label=path,
+        )
+
+    @classmethod
+    def from_dict(
+        cls, raw: dict[str, Any], config_dir: Path, raw_text: str | None = None,
+        label: str = "<dict>",
+    ) -> RunConfig:
+        """Build a ``RunConfig`` object from an already parsed config.
+
+        Parameters
+        ----------
+        raw: dict[str, Any]
+            The parsed config, with the same layout as a config yaml file.
+        config_dir: Path
+            Directory relative paths in ``data`` are resolved against.
+        raw_text: str or None
+            Text saved next to the chain; ``raw`` dumped as yaml if ``None``.
+        label: str
+            Name of the config, used in the error messages.
+
+        Returns
+        -------
+        config: RunConfig
+            The resolved ``RunConfig`` object.
+        """
+        if raw_text is None:
+            raw_text = yaml.safe_dump(raw, sort_keys=False)
 
         missing = [key for key in REQUIRED_SECTIONS if key not in raw]
         if missing:
             raise ValueError(
-                f"Config '{path}' is missing required section(s): {missing}"
+                f"Config '{label}' is missing required section(s): {missing}"
             )
 
         if "kind" not in raw["probe"]:
@@ -437,7 +496,7 @@ class RunConfig:
             raise ValueError("'sampler' section is missing required key 'kind'")
 
         if raw["probe"]["kind"] in PHOTO_PROBES:
-            data = PhotoDataConfig.from_dict(raw["data"], config_dir=config_path.parent)
+            data = PhotoDataConfig.from_dict(raw["data"], config_dir=config_dir)
             _check_photo_sampled_parameters(raw["sampled_parameters"])
             sampled_parameters = raw["sampled_parameters"]
             if "scale_cuts" not in raw:
@@ -446,7 +505,7 @@ class RunConfig:
                 )
             scale_cuts = _parse_photo_scale_cuts(raw["scale_cuts"])
         else:
-            data = DataConfig.from_dict(raw["data"], config_dir=config_path.parent)
+            data = DataConfig.from_dict(raw["data"], config_dir=config_dir)
             sampled_parameters = _normalize_sampled_parameters(
                 raw["sampled_parameters"], data
             )
@@ -468,4 +527,7 @@ class RunConfig:
             raw_text=raw_text,
             constraints=raw.get("constraints", {}),
             derived_parameters=derived_parameters,
+            derived_outputs=list(raw.get("derived_outputs", [])),
+            fiducial_parameters=raw.get("fiducial_parameters", {}),
+            prune_parameters=bool(raw.get("prune_parameters", False)),
         )

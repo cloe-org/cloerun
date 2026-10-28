@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
-from cloechain.priors import Priors
+from cloerun._core.priors import Priors
 
 # Columns that always come before the sampled parameters.
 RESERVED_COLUMNS = ["logweight", "loglikelihood"]
@@ -18,7 +18,8 @@ RESERVED_COLUMNS = ["logweight", "loglikelihood"]
 class Chain:
     """Sampled posterior distribution.
 
-    Columns are always in this format: ``[logweight, loglikelihood, *params]``.
+    Columns are always in this format:
+    ``[logweight, loglikelihood, *params, *derived]``.
 
     Attributes
     ----------
@@ -33,7 +34,9 @@ class Chain:
 
     @classmethod
     def build(cls, priors: Priors, points: np.ndarray,
-              logweight: np.ndarray, loglikelihood: np.ndarray) -> Chain:
+              logweight: np.ndarray, loglikelihood: np.ndarray,
+              derived: np.ndarray | None = None,
+              derived_names: list[str] = ()) -> Chain:
         """Build a `Chain` object from a sampler raw output.
 
         Parameters
@@ -46,15 +49,23 @@ class Chain:
             Log-weight of each sample, as returned by the sampler.
         loglikelihood: np.ndarray
             Log-likelihood of each sample, as returned by the sampler.
+        derived: np.ndarray or None
+            Derived quantities of each sample, of shape
+            ``(n_samples, len(derived_names))``.
+        derived_names: list[str]
+            Names of the derived quantities.
 
         Returns
         -------
         chain: Chain
             The standardized `Chain` object, with columns in the order
-            ``[logweight, loglikelihood, *priors.names]``.
+            ``[logweight, loglikelihood, *priors.names, *derived_names]``.
         """
-        columns = RESERVED_COLUMNS + priors.names
-        samples = np.column_stack([logweight, loglikelihood, points])
+        columns = RESERVED_COLUMNS + priors.names + list(derived_names)
+        blocks = [logweight, loglikelihood, points]
+        if derived is not None:
+            blocks.append(derived)
+        samples = np.column_stack(blocks)
         return cls(columns=columns, samples=samples)
 
     def save(self, path: str | Path, filename: str) -> Path:
@@ -106,7 +117,8 @@ class Chain:
     
     @property
     def parameters(self) -> list[str]:
-        """Sampled parameter names, excluding the reserved columns."""
+        """Sampled parameter and derived quantity names, excluding the
+        reserved columns."""
         return self.columns[len(RESERVED_COLUMNS):]
 
     def column(self, name: str) -> np.ndarray:

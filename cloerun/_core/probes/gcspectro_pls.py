@@ -12,9 +12,9 @@ from euclidlib.le3.pk_gc import (
 
 from cloelike.EuclidLikelihood_GCspectro_Pls import EuclidLikelihood_GCspectro_Pls
 
-from cloechain.config import RunConfig
-from cloechain.loader import load_background, load_perturbations, load_spectro_power
-from cloechain.priors import extract_AM_priors
+from cloerun._core.config import RunConfig
+from cloerun._core.loader import load_background, load_perturbations, load_spectro_power
+from cloerun._core.priors import extract_AM_priors
 
 _BACKGROUND_PACKAGES = {
     "CAMB": "camb",
@@ -183,7 +183,7 @@ def loglike(likelihood: EuclidLikelihood_GCspectro_Pls, parameters: dict[str, An
         An instance of the likelihood.
     parameters: dict[str, Any]
         Full parameter dictionary in the format returned by
-        `cloechain.parameters.build_parameter_dict_for_loglike`.
+        `cloerun._core.parameters.build_parameter_dict_for_loglike`.
 
     Returns
     -------

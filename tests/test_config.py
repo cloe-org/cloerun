@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from cloechain.config import DataConfig, PhotoDataConfig, RunConfig
+from cloerun._core.config import DataConfig, PhotoDataConfig, RunConfig
 
 EXAMPLES = Path(__file__).parents[1] / "examples"
 

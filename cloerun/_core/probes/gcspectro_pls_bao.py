@@ -14,10 +14,10 @@ from euclidlib.le3.pk_gc import (
 
 from cloelike.EuclidLikelihood_GCspectro_Pls_BAO import EuclidLikelihood_GCspectro_Pls_BAO
 
-from cloechain.config import RunConfig
-from cloechain.loader import load_background, load_spectro_power
-from cloechain.priors import extract_AM_priors
-from cloechain.probes.gcspectro_pls import (
+from cloerun._core.config import RunConfig
+from cloerun._core.loader import load_background, load_spectro_power
+from cloerun._core.priors import extract_AM_priors
+from cloerun._core.probes.gcspectro_pls import (
     _build_settings,
     _load_perturbations_if_needed,
     loglike,
