@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/cloerun_banner.png" alt="cloerun banner" width="600">
+</p>
+
 # cloerun
 
 Run Euclid inference campaigns with
