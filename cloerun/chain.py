@@ -19,7 +19,7 @@ from cloerun._core.config import RunConfig
 from cloerun._core.loader import load_sampler
 from cloerun._core.setup import prepare
 from cloerun._core.versions import write_config_with_versions
-from cloerun.campaign import add_run_arguments, load_runs
+from cloerun.campaign import add_run_arguments, load_runs, run_options
 
 __all__ = ["Chain", "run_chain", "test_loglike"]
 
@@ -99,6 +99,6 @@ def main(argv: list[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
     mode = "test" if args.test else "chain"
-    for name, config, _ in load_runs(args.file, args.runs, mode=mode):
+    for name, config, _ in load_runs(args.file, mode=mode, **run_options(args)):
         print(f"=== {name} ({mode})")
         test_loglike(config) if args.test else run_chain(config)

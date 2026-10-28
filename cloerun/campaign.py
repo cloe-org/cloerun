@@ -232,7 +232,11 @@ def _variables(config: dict[str, Any], name: str, output_dir: str) -> dict[str, 
     return variables
 
 
-def load_campaign(path: str | Path) -> list[CampaignRun]:
+def load_campaign(
+    path: str | Path,
+    output_dir: str | Path | None = None,
+    overrides: dict[str, Any] | None = None,
+) -> list[CampaignRun]:
     """Resolve every run of a campaign file, or the single run of a
     pipeline config file.
 
@@ -240,6 +244,12 @@ def load_campaign(path: str | Path) -> list[CampaignRun]:
     ----------
     path: str or Path
         The campaign (or pipeline config) file.
+    output_dir: str, Path or None
+        Replaces the campaign's ``output_dir``; for a pipeline config, the
+        directory of its outputs (``${output_dir}``), by default ``chains``
+        in the working directory.
+    overrides: dict[str, Any] or None
+        Applied to every run after its components, as one more component.
 
     Returns
     -------
@@ -250,15 +260,18 @@ def load_campaign(path: str | Path) -> list[CampaignRun]:
     campaign = yaml.safe_load(path.read_text())
     if "runs" not in campaign:
         config = load_pipeline_config(path)
+        if overrides:
+            config = apply_component(config, overrides, "--set")
         name = config.get("run", {}).get("name", path.stem)
-        output_dir = str(path.parent / config.get("run", {}).get("output_dir", "chains"))
+        output_dir = str(Path(output_dir or "chains").resolve())
         config = interpolate(config, _variables(config, name, output_dir))
         return [CampaignRun(name, config, path.parent, output_dir)]
 
     for key in ("output_dir", "output_name"):
         if key not in campaign:
             raise ValueError(f"Campaign '{path}' is missing '{key}'")
-    output_dir = str(path.parent / campaign["output_dir"] / campaign["output_name"])
+    base_output = Path(output_dir).resolve() if output_dir else path.parent / campaign["output_dir"]
+    output_dir = str((base_output / campaign["output_name"]).resolve())
     components = campaign.get("components") or {}
     specs = {}
     for spec in campaign["runs"]:
@@ -295,6 +308,8 @@ def load_campaign(path: str | Path) -> list[CampaignRun]:
     runs = []
     for name in specs:
         config, config_dir = resolve(name)
+        if overrides:
+            config = apply_component(config, overrides, "--set")
         config = interpolate(config, _variables(config, name, output_dir))
         runs.append(CampaignRun(name, config, config_dir, output_dir))
     return runs
@@ -304,7 +319,11 @@ MODES = ("chain", "sdv", "test")
 
 
 def load_runs(
-    path: str | Path, names: list[str] | None = None, mode: str | None = None
+    path: str | Path,
+    names: list[str] | None = None,
+    mode: str | None = None,
+    output_dir: str | Path | None = None,
+    overrides: dict[str, Any] | None = None,
 ) -> list[tuple[str, RunConfig, str]]:
     """The runs of a campaign file, of a pipeline config, or of a cloerun
     config (``probe``, ``data``, ... at the top level).
@@ -317,17 +336,33 @@ def load_runs(
         Only these runs, in the order of the file; every run if ``None``.
     mode: str or None
         Overrides ``run.mode`` if given.
+    output_dir: str, Path or None
+        Directory of the outputs, see `load_campaign`; for a cloerun config,
+        replaces ``output.directory``.
+    overrides: dict[str, Any] or None
+        Applied to every run as one more component, see `parse_overrides`.
 
     Returns
     -------
     runs: list[tuple[str, RunConfig, str]]
         Name, config and mode of each run.
     """
-    if "probe" in yaml.safe_load(Path(path).read_text()):
-        config = RunConfig.from_yaml(str(path))
+    path = Path(path)
+    raw = yaml.safe_load(path.read_text())
+    if "probe" in raw:
+        if overrides:
+            raw = apply_component(raw, overrides, "--set")
+        if output_dir is not None:
+            raw["output"] = {**raw["output"], "directory": str(Path(output_dir).resolve())}
+        config = RunConfig.from_dict(
+            raw, path.resolve().parent, raw_text=yaml.safe_dump(raw, sort_keys=False),
+            label=str(path),
+        )
+        campaign_runs = None
         runs = [(config.output["name"], config, mode or "chain")]
     else:
-        runs = [(r.name, *r.to_run_config(mode)) for r in load_campaign(path)]
+        campaign_runs = load_campaign(path, output_dir, overrides)
+        runs = [(r.name, r, None) for r in campaign_runs]
     if names:
         unknown = sorted(set(names) - {name for name, _, _ in runs})
         if unknown:
@@ -335,12 +370,45 @@ def load_runs(
                 f"Unknown run(s) {unknown}; available: {[name for name, _, _ in runs]}"
             )
         runs = [run for run in runs if run[0] in names]
-    return runs
+    if campaign_runs is None:
+        return runs
+    # Translated after the selection, so that a broken run does not block the
+    # others.
+    translated = []
+    for name, campaign_run, _ in runs:
+        try:
+            translated.append((name, *campaign_run.to_run_config(mode)))
+        except (ValueError, KeyError, OSError) as error:
+            raise ValueError(f"Run '{name}': {error}") from error
+    return translated
+
+
+def parse_overrides(assignments: list[str] | None) -> dict[str, Any]:
+    """Read ``--set PATH=VALUE`` options into a component.
+
+    Parameters
+    ----------
+    assignments: list[str] or None
+        E.g. ``["inference.sampler.settings.n_live=200"]``. Values are read
+        as yaml: ``200`` is a number, ``[10, 1500]`` a list, ``null`` None.
+
+    Returns
+    -------
+    overrides: dict[str, Any]
+        Dotted keys and values, see `apply_component`.
+    """
+    overrides = {}
+    for assignment in assignments or []:
+        key, sep, value = assignment.partition("=")
+        if not sep or not key:
+            raise ValueError(f"--set expects PATH=VALUE, got '{assignment}'")
+        overrides[key.strip()] = yaml.safe_load(value)
+    return overrides
 
 
 def add_run_arguments(parser: argparse.ArgumentParser) -> None:
-    """Arguments shared by the ``cloerun`` commands: the config file and the
-    selection of runs.
+    """Arguments shared by the ``cloerun`` commands: the config file, the
+    selection of runs, the output directory and ``--set`` overrides.
 
     Parameters
     ----------
@@ -351,10 +419,39 @@ def add_run_arguments(parser: argparse.ArgumentParser) -> None:
         "--run", action="append", dest="runs", metavar="NAME",
         help="Only this run (repeat for several). Default: every run.",
     )
+    parser.add_argument(
+        "--output-dir", metavar="DIR",
+        help="Directory of the outputs (${output_dir}). Default: the campaign's "
+        "output_dir, or ./chains for a single config.",
+    )
+    parser.add_argument(
+        "--set", action="append", dest="overrides", metavar="PATH=VALUE",
+        help="Change one setting of every run without editing the files, e.g. "
+        "--set inference.sampler.settings.n_live=200 (repeat for several).",
+    )
+
+
+def run_options(args: argparse.Namespace) -> dict[str, Any]:
+    """Keyword arguments of `load_runs` from the parsed `add_run_arguments`.
+
+    Parameters
+    ----------
+    args: argparse.Namespace
+
+    Returns
+    -------
+    options: dict[str, Any]
+    """
+    return {
+        "names": args.runs,
+        "output_dir": args.output_dir,
+        "overrides": parse_overrides(args.overrides),
+    }
 
 
 def run_campaign(
-    path: str | Path, names: list[str] | None = None, mode: str | None = None
+    path: str | Path, names: list[str] | None = None, mode: str | None = None,
+    **options: Any,
 ) -> dict[str, Any]:
     """Run every selected run of a campaign in its ``run.mode``.
 
@@ -366,6 +463,8 @@ def run_campaign(
         Only these runs.
     mode: str or None
         Overrides ``run.mode`` if given.
+    **options
+        ``output_dir`` and ``overrides``, see `load_runs`.
 
     Returns
     -------
@@ -378,7 +477,7 @@ def run_campaign(
 
     actions = {"chain": run_chain, "sdv": write_sdv, "test": test_loglike}
     results = {}
-    for name, config, run_mode in load_runs(path, names, mode):
+    for name, config, run_mode in load_runs(path, names, mode, **options):
         if run_mode not in actions:
             raise ValueError(
                 f"Run '{name}': unknown mode '{run_mode}'; expected one of {list(MODES)}"
@@ -401,9 +500,10 @@ def main(argv: list[str] | None = None) -> None:
         help="Print the resolved cloerun config of each run, without running it.",
     )
     args = parser.parse_args(argv)
+    options = run_options(args)
     if not args.dry_run:
-        run_campaign(args.file, args.runs, args.mode)
+        run_campaign(args.file, mode=args.mode, **options)
         return
-    for name, config, mode in load_runs(args.file, args.runs, args.mode):
+    for name, config, mode in load_runs(args.file, mode=args.mode, **options):
         print(f"=== {name} ({mode})")
         print(config.raw_text)

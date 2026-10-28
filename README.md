@@ -83,22 +83,44 @@ cloe-org/
 
 ## Usage
 
+From the `cloe-org/` folder, with the configs of `dr1-inference/`:
+
 ```bash
-cloerun campaign dr1-inference/cosmic-shear/campaign.yaml           # every run, in its run.mode
-cloerun campaign campaign.yaml --dry-run                            # print the resolved configs
-cloerun sdv      campaign.yaml --run sdv_WL_fiducial                # synthetic data vector
-cloerun chain    campaign.yaml --run chain_WL_baseline --test       # one loglike at the fiducial
-cloerun chain    campaign.yaml --run chain_WL_baseline              # sample
-cloerun analyse  campaign.yaml --run chain_WL_baseline --params omch2 H0 S8
-cloerun chain    examples/gcspectro_pls_nautilus.yaml                # a spectroscopic chain
+C=dr1-inference/cosmic-shear
+cloerun sdv      $C/config.yaml                             # synthetic data vector of the config
+cloerun chain    $C/config.yaml --test                      # one loglike at the fiducial point
+cloerun chain    $C/config.yaml                             # sample
+cloerun campaign $C/campaign.yaml                           # every run, in its run.mode
+cloerun campaign $C/campaign.yaml --dry-run                 # print the resolved configs
+cloerun chain    $C/campaign.yaml --run chain_WL_baseline   # one run of the campaign
+cloerun analyse  $C/campaign.yaml --run chain_WL_baseline --params omch2 H0 S8
+cloerun chain    cloerun/examples/gcspectro_pls_nautilus.yaml   # a spectroscopic chain
 ```
 
-Every command takes a campaign file, a single pipeline config, or a cloerun
-config (see [cloerun configs](#cloerun-configs)), and `--run NAME` (repeat for
-several) to select runs. `--test` evaluates the log-likelihood at the
-fiducial values of the config, and at the prior median of the sampled
-parameters without one. `cloerun <command> --help` lists the options;
-`python -m cloerun` works as well.
+Every command takes a campaign file, a single pipeline config (`config.yaml`)
+or a cloerun config (see [cloerun configs](#cloerun-configs)), and:
+
+- `--run NAME` (repeat for several) selects runs of a campaign.
+- `--output-dir DIR` is where the outputs go (`${output_dir}`). By default
+  it is the campaign's `output_dir`, or `./chains` for a single config, so
+  that nothing is written into the configs repository.
+- `--set PATH=VALUE` (repeat for several) changes one setting of every run
+  without editing the shared configs, as a component would: a dotted
+  `PATH`, and a yaml `VALUE`. Use it for what only holds on your machine,
+  e.g. the data paths or a smaller sampler:
+
+  ```bash
+  cloerun chain $C/config.yaml \
+      --set run.root_dir=/path/to/dr1/data \
+      --set inference.sampler.settings.n_live=400 \
+      --set inference.sampler.settings.pool=8 \
+      --set inference.sampler.run_settings.timeout=3600
+  ```
+
+`--test` evaluates the log-likelihood at the fiducial values of the config,
+and at the prior median of the sampled parameters without one.
+`cloerun <command> --help` lists the options; `python -m cloerun` works as
+well.
 
 From Python:
 

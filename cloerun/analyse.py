@@ -21,7 +21,7 @@ import numpy as np
 from cloerun._core.chain_data import Chain
 from cloerun._core.config import RunConfig
 from cloerun._core.templates import expand_bin_templates, prune_unused
-from cloerun.campaign import add_run_arguments, load_runs
+from cloerun.campaign import add_run_arguments, load_runs, run_options
 
 # Axis labels of the usual parameters; others are labelled with their name.
 LABELS = {
@@ -304,6 +304,6 @@ def main(argv: list[str] | None = None) -> None:
         help="Parameters of the triangle plot. Default: all but the per-bin ones.",
     )
     args = parser.parse_args(argv)
-    for name, config, _ in load_runs(args.file, args.runs, mode="chain"):
+    for name, config, _ in load_runs(args.file, mode="chain", **run_options(args)):
         print(f"=== {name} (analyse)")
         analyse_run(config, args.params)

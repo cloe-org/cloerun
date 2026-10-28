@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from cloerun.campaign import apply_component, load_campaign, load_runs, main
+from cloerun.campaign import apply_component, load_campaign, load_runs, main, parse_overrides
 
 
 def _config():
@@ -126,11 +126,20 @@ def test_campaign_errors(tmp_path, runs, components, match):
         load_campaign(_write_campaign(tmp_path, runs, components))
 
 
-def test_single_pipeline_config(tmp_path):
+def test_single_pipeline_config(tmp_path, monkeypatch):
     _write_campaign(tmp_path, runs=[], components={})
+    work = tmp_path / "work"
+    work.mkdir()
+    monkeypatch.chdir(work)
     (run,) = load_campaign(tmp_path / "config.yaml")
     assert run.name == "config"
-    assert run.output_dir == str(tmp_path / "chains")
+    # Outputs go to the working directory, not next to the shared config.
+    assert run.output_dir == str(work.resolve() / "chains")
+    (run,) = load_campaign(tmp_path / "config.yaml", output_dir=tmp_path / "out")
+    assert run.output_dir == str((tmp_path / "out").resolve())
+    assert run.config["inference"]["sampler"]["settings"]["filepath"] == (
+        f"{(tmp_path / 'out').resolve()}/config.hdf5"
+    )
 
 
 def test_cli_dry_run(tmp_path, capsys):
@@ -193,3 +202,40 @@ def test_cloerun_config_as_base(tmp_path):
     assert runs["bao"][0].sampled_parameters["ombh2"]["scale"] == 0.00038
     # Data paths stay relative to the base config.
     assert config.data.covariance_template == str(tmp_path / "../data/EUC_LE3_BAO_COV_Z{}.fits")
+
+
+def test_overrides(tmp_path):
+    path = _write_campaign(
+        tmp_path,
+        runs=[{"name": "a", "base": "config.yaml"}, {"name": "b", "parent": "a", "components": ["c"]}],
+        components={"c": {"inference.sampler.settings.n_live": 4000}},
+    )
+    overrides = parse_overrides(["inference.sampler.settings.n_live=200", "w0=-0.9"])
+    assert overrides == {"inference.sampler.settings.n_live": 200, "w0": -0.9}
+    runs = {r.name: r for r in load_campaign(path, overrides=overrides)}
+    # Overrides come after the components.
+    assert runs["b"].config["inference"]["sampler"]["settings"]["n_live"] == 200
+    assert runs["a"].config["modelling"]["parameters"]["cosmology"]["w0"] == -0.9
+    with pytest.raises(ValueError, match="PATH=VALUE"):
+        parse_overrides(["n_live"])
+
+
+def test_campaign_output_dir_option(tmp_path):
+    path = _write_campaign(tmp_path, runs=[{"name": "a", "base": "config.yaml"}], components={})
+    (run,) = load_campaign(path, output_dir=tmp_path / "elsewhere")
+    assert run.output_dir == str((tmp_path / "elsewhere" / "campaign").resolve())
+
+
+def test_broken_run_does_not_block_the_others(tmp_path):
+    path = _write_campaign(
+        tmp_path,
+        runs=[
+            {"name": "a", "base": "config.yaml"},
+            {"name": "broken", "parent": "a", "components": ["missing_cuts"]},
+        ],
+        components={"missing_cuts": {"scale_cuts": {"kind": "from_file", "from_file": "nope.yaml"}}},
+    )
+    ((name, _, _),) = load_runs(path, ["a"])
+    assert name == "a"
+    with pytest.raises(ValueError, match="Run 'broken'"):
+        load_runs(path)

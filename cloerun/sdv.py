@@ -12,7 +12,7 @@ from pathlib import Path
 
 from cloerun._core.config import RunConfig
 from cloerun._core.setup import prepare
-from cloerun.campaign import add_run_arguments, load_runs
+from cloerun.campaign import add_run_arguments, load_runs, run_options
 
 
 def write_sdv(config: RunConfig) -> Path:
@@ -50,6 +50,6 @@ def main(argv: list[str] | None = None) -> None:
     )
     add_run_arguments(parser)
     args = parser.parse_args(argv)
-    for name, config, _ in load_runs(args.file, args.runs, mode="sdv"):
+    for name, config, _ in load_runs(args.file, mode="sdv", **run_options(args)):
         print(f"=== {name} (sdv)")
         write_sdv(config)
