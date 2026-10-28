@@ -136,7 +136,11 @@ def build_likelihood(cfg: RunConfig) -> EuclidLikelihood_GCspectro_Pls_BAO:
     SpectroPower = load_spectro_power(
         spectro_power_cfg["code"], spectro_power_cfg.get("rsd_model")
     )
-    Perturbations = _load_perturbations_if_needed(SpectroPower, cfg.probe["background"])
+    # tilde_params isn't supported yet by EuclidLikelihood_GCspectro_Pls_BAO,
+    # so a Perturbations instance is only ever needed here for PBJ's own theory.
+    Perturbations = _load_perturbations_if_needed(
+        SpectroPower, cfg.probe["background"], None
+    )
 
     AM_priors = extract_AM_priors(cfg.sampled_parameters, cfg.data.labels)
 

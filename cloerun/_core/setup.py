@@ -3,6 +3,7 @@ log-likelihood handed to the samplers."""
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -111,7 +112,13 @@ class LogLikelihood:
                 return failed
         try:
             loglike = self.probe.loglike(self.likelihood, parameters)
-        except (ValueError, RuntimeError):
+        except (ValueError, RuntimeError) as error:
+            print(f"[loglike] {type(error).__name__}: {error} at {flat_sample}",
+                  file=sys.stderr, flush=True)
+            return failed
+        if not np.isfinite(loglike):
+            print(f"[loglike] non-finite value {loglike} at {flat_sample}",
+                  file=sys.stderr, flush=True)
             return failed
         if not derived_names:
             return loglike

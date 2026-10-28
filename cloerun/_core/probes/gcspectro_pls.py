@@ -19,6 +19,10 @@ from cloerun._core.priors import extract_AM_priors
 _BACKGROUND_PACKAGES = {
     "CAMB": "camb",
 }
+_PERTURBATIONS_PACKAGES = {
+    "CAMB": "camb",
+    "HMcode2020Emu": "HMcode2020Emu",
+}
 _SPECTRO_POWER_PACKAGES = {
     "COMET": "comet-emu",
     "PBJ": "pbjcosmo",
@@ -108,23 +112,33 @@ def _build_settings(cfg: RunConfig, h_fid: float) -> dict[str, Any]:
     return {"GCspectro": {"scale_cuts": scale_cuts}}
 
 
-def _load_perturbations_if_needed(SpectroPower: type, background_name: str):
-    """Return the `Perturbations` class `SpectroPower` needs, or `None`.
+def _load_perturbations_if_needed(
+    SpectroPower: type, perturbations_name: str, tilde_params: dict[str, Any]
+):
+    """Return the `Perturbations` class this run needs, or `None`.
+
+    A `Perturbations` instance is needed either because `SpectroPower`'s
+    theory itself requires one (PBJ), or because `tilde_params` needs one to
+    compute sigma12 (even for COMET, which otherwise doesn't need one) --
+    see `EuclidLikelihood_GCspectro_Pls`'s own `tilde_params` docstring.
 
     Parameters
     ----------
     SpectroPower: type
         The selected SpectroPower class.
-    background_name: str
-        The config's ``probe.background``.
+    perturbations_name: str
+        The config's ``probe.perturbations`` (or ``probe.background`` if
+        not given explicitly).
+    tilde_params: dict[str, Any]
+        The config's ``probe.tilde_params`` section (possibly empty).
 
     Returns
     -------
     perturbations: type or None
     """
-    if SpectroPower.NLcode != "PBJ":
+    if SpectroPower.NLcode != "PBJ" and not tilde_params:
         return None
-    return load_perturbations(background_name)
+    return load_perturbations(perturbations_name)
 
 
 def build_likelihood(cfg: RunConfig) -> EuclidLikelihood_GCspectro_Pls:
@@ -159,11 +173,15 @@ def build_likelihood(cfg: RunConfig) -> EuclidLikelihood_GCspectro_Pls:
     SpectroPower = load_spectro_power(
         spectro_power_cfg["code"], spectro_power_cfg.get("rsd_model")
     )
-    Perturbations = _load_perturbations_if_needed(SpectroPower, cfg.probe["background"])
+    tilde_params = cfg.probe.get("tilde_params") or None
+    perturbations_name = cfg.probe.get("perturbations", cfg.probe["background"])
+    Perturbations = _load_perturbations_if_needed(
+        SpectroPower, perturbations_name, tilde_params
+    )
 
     AM_priors = extract_AM_priors(cfg.sampled_parameters, cfg.data.labels)
 
-    return EuclidLikelihood_GCspectro_Pls(
+    likelihood = EuclidLikelihood_GCspectro_Pls(
         data=data,
         settings=settings,
         Background=Background,
@@ -171,7 +189,13 @@ def build_likelihood(cfg: RunConfig) -> EuclidLikelihood_GCspectro_Pls:
         Perturbations=Perturbations,
         AM_priors=AM_priors,
         num_mocks=cfg.data.num_mocks,
+        tilde_params=tilde_params,
     )
+    # Not a constructor argument of the likelihood: read back by `loglike`,
+    # which passes it to `loglike_AM` (Jeffreys priors on the analytically
+    # marginalised parameters).
+    likelihood.use_Jeffreys = bool(cfg.probe.get("use_Jeffreys", False))
+    return likelihood
 
 
 def loglike(likelihood: EuclidLikelihood_GCspectro_Pls, parameters: dict[str, Any]) -> float:
@@ -191,7 +215,9 @@ def loglike(likelihood: EuclidLikelihood_GCspectro_Pls, parameters: dict[str, An
         The log-likelihood value.
     """
     if likelihood.AM_priors:
-        return likelihood.loglike_AM(parameters)
+        return likelihood.loglike_AM(
+            parameters, use_Jeffreys=getattr(likelihood, "use_Jeffreys", False)
+        )
     return likelihood.loglike(parameters)
 
 
@@ -230,7 +256,15 @@ def tracked_packages(cfg: RunConfig) -> list[str]:
     background_name = cfg.probe["background"]
     if background_name in _BACKGROUND_PACKAGES:
         packages.append(_BACKGROUND_PACKAGES[background_name])
-    code = cfg.probe["spectro_power"]["code"]
+    spectro_power_cfg = cfg.probe["spectro_power"]
+    code = spectro_power_cfg["code"]
     if code in _SPECTRO_POWER_PACKAGES:
         packages.append(_SPECTRO_POWER_PACKAGES[code])
+    tilde_params = cfg.probe.get("tilde_params")
+    perturbations_needed = code == "PBJ" or bool(tilde_params)
+    if perturbations_needed:
+        perturbations_name = cfg.probe.get("perturbations", background_name)
+        package = _PERTURBATIONS_PACKAGES.get(perturbations_name)
+        if package is not None and package not in packages:
+            packages.append(package)
     return packages
