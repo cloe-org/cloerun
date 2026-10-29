@@ -113,14 +113,14 @@ def _build_settings(cfg: RunConfig, h_fid: float) -> dict[str, Any]:
 
 
 def _load_perturbations_if_needed(
-    SpectroPower: type, perturbations_name: str, tilde_params: dict[str, Any]
+    SpectroPower: type, perturbations_name: str, TCM_params: dict[str, Any]
 ):
     """Return the `Perturbations` class this run needs, or `None`.
 
     A `Perturbations` instance is needed either because `SpectroPower`'s
-    theory itself requires one (PBJ), or because `tilde_params` needs one to
+    theory itself requires one (PBJ), or because `TCM_params` needs one to
     compute sigma12 (even for COMET, which otherwise doesn't need one) --
-    see `EuclidLikelihood_GCspectro_Pls`'s own `tilde_params` docstring.
+    see `EuclidLikelihood_GCspectro_Pls`'s own `TCM_params` docstring.
 
     Parameters
     ----------
@@ -129,14 +129,14 @@ def _load_perturbations_if_needed(
     perturbations_name: str
         The config's ``probe.perturbations`` (or ``probe.background`` if
         not given explicitly).
-    tilde_params: dict[str, Any]
-        The config's ``probe.tilde_params`` section (possibly empty).
+    TCM_params: dict[str, Any]
+        The config's ``probe.TCM_params`` section (possibly empty).
 
     Returns
     -------
     perturbations: type or None
     """
-    if SpectroPower.NLcode != "PBJ" and not tilde_params:
+    if SpectroPower.NLcode != "PBJ" and not TCM_params:
         return None
     return load_perturbations(perturbations_name)
 
@@ -173,10 +173,10 @@ def build_likelihood(cfg: RunConfig) -> EuclidLikelihood_GCspectro_Pls:
     SpectroPower = load_spectro_power(
         spectro_power_cfg["code"], spectro_power_cfg.get("rsd_model")
     )
-    tilde_params = cfg.probe.get("tilde_params") or None
+    TCM_params = cfg.probe.get("TCM_params") or None
     perturbations_name = cfg.probe.get("perturbations", cfg.probe["background"])
     Perturbations = _load_perturbations_if_needed(
-        SpectroPower, perturbations_name, tilde_params
+        SpectroPower, perturbations_name, TCM_params
     )
 
     AM_priors = extract_AM_priors(cfg.sampled_parameters, cfg.data.labels)
@@ -189,7 +189,7 @@ def build_likelihood(cfg: RunConfig) -> EuclidLikelihood_GCspectro_Pls:
         Perturbations=Perturbations,
         AM_priors=AM_priors,
         num_mocks=cfg.data.num_mocks,
-        tilde_params=tilde_params,
+        TCM_params=TCM_params,
     )
     # Not a constructor argument of the likelihood: read back by `loglike`,
     # which passes it to `loglike_AM` (Jeffreys priors on the analytically
@@ -260,8 +260,8 @@ def tracked_packages(cfg: RunConfig) -> list[str]:
     code = spectro_power_cfg["code"]
     if code in _SPECTRO_POWER_PACKAGES:
         packages.append(_SPECTRO_POWER_PACKAGES[code])
-    tilde_params = cfg.probe.get("tilde_params")
-    perturbations_needed = code == "PBJ" or bool(tilde_params)
+    TCM_params = cfg.probe.get("TCM_params")
+    perturbations_needed = code == "PBJ" or bool(TCM_params)
     if perturbations_needed:
         perturbations_name = cfg.probe.get("perturbations", background_name)
         package = _PERTURBATIONS_PACKAGES.get(perturbations_name)
