@@ -32,6 +32,9 @@ from cloerun._core.config import PHOTO_BLOCKS
 from cloerun._core.loader import PHOTO_PROBES
 
 SECTIONS = ("run", "modelling", "inference")
+# The sdv mode only computes the theory at the fiducial point: it needs no
+# data vector, covariance, scale cuts or sampler.
+SDV_SECTIONS = ("run", "modelling")
 
 # Names of the parameter file that cloelike reads under another name.
 PARAMETER_ALIASES = {"logAs": "logA"}
@@ -297,13 +300,18 @@ def to_run_config(
     raw: dict[str, Any]
         The cloerun config, to pass to `cloerun._core.config.RunConfig.from_dict`.
     mode: str
-        The ``run.mode``: ``chain``, ``sdv`` or ``test``.
+        The ``run.mode``: ``chain``, ``sdv`` or ``test``. The ``sdv`` mode
+        does not read the ``inference`` section, which may be left out.
     """
-    mode = mode or config["run"].get("mode", "chain")
-    missing = [section for section in SECTIONS if section not in config]
+    mode = mode or config.get("run", {}).get("mode", "chain")
+    sdv = mode == "sdv"
+    missing = [
+        section for section in (SDV_SECTIONS if sdv else SECTIONS) if section not in config
+    ]
     if missing:
         raise ValueError(f"Pipeline config is missing section(s) {missing}")
-    modelling, inference = config["modelling"], config["inference"]
+    modelling = config["modelling"]
+    inference = {} if sdv else config["inference"]
     probe = modelling.get("probe")
     if probe not in PHOTO_PROBES:
         raise ValueError(
@@ -330,7 +338,6 @@ def to_run_config(
         "z_grid": {
             key: nz[f"zs_{key}"] for key in ("min", "max", "num") if f"zs_{key}" in nz
         },
-        "covariance": likelihood["covariance"],
         "noise_free_mock": bool(likelihood.get("noise_free_mock", False)),
     }
     if "file" in nz:
@@ -339,8 +346,8 @@ def to_run_config(
         if key in nz:
             data[f"nz_{key}"] = nz[key]
     for key, source in (
-        # The sdv mode writes the data vector: it does not read one.
-        ("cells", likelihood.get("data_vector") if mode != "sdv" else None),
+        ("cells", likelihood.get("data_vector")),
+        ("covariance", None if sdv else likelihood["covariance"]),
         ("covariance_key", likelihood.get("covariance_key")),
         ("mixing", coupling.get("mixing_matrices") if probe_section["mode"] == "coupled" else None),
     ):
@@ -353,17 +360,18 @@ def to_run_config(
     raw = {
         "probe": probe_section,
         "data": data,
-        "scale_cuts": _scale_cuts(inference["scale_cuts"], probe, config_dir),
         **parse_parameters(modelling["parameters"]),
         "prune_parameters": True,
         "derived_outputs": list(inference.get("derived_outputs", [])),
-        "sampler": inference["sampler"],
         "output": {
             "directory": output_dir,
             "name": name,
             "sdv_file": _resolve(output.get("file", f"{output_dir}/{name}_sdv.fits"), config_dir),
         },
     }
+    if not sdv:
+        raw["scale_cuts"] = _scale_cuts(inference["scale_cuts"], probe, config_dir)
+        raw["sampler"] = inference["sampler"]
     return raw, mode
 
 
