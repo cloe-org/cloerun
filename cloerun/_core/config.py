@@ -13,6 +13,9 @@ from cloerun._core.loader import DERIVED_PARAMETERS, PHOTO_PROBES
 REQUIRED_SECTIONS = (
     "probe", "data", "fixed_parameters", "sampled_parameters", "sampler", "output",
 )
+# The sdv mode only computes the theory at the fiducial point: it needs no
+# sampler (nor covariance or scale cuts).
+SDV_REQUIRED_SECTIONS = tuple(s for s in REQUIRED_SECTIONS if s != "sampler")
 
 
 def _redshift_label(z: float) -> str:
@@ -303,10 +306,11 @@ class PhotoDataConfig:
         Path of the angular power spectra file, or ``None`` with
         ``noise_free_mock: true``: the data vector is then the theory at the
         fiducial, on the multipoles given by ``ells``.
-    covariance: str
+    covariance: str or None
         Path of the covariance file (``.npz`` or ``.npy``). It covers either
         exactly the blocks of the probe, or the full 3x2pt data vector, in
-        which case the blocks of the probe are extracted from it.
+        which case the blocks of the probe are extracted from it. ``None``
+        only in the ``sdv`` mode, which does not need it.
     covariance_key: str or None
         Array to read from a ``.npz`` covariance file with several arrays.
     mixing: str or None
@@ -324,14 +328,14 @@ class PhotoDataConfig:
     nz_shear: str
     z_grid: dict[str, float]
     cells: Optional[str]
-    covariance: str
+    covariance: Optional[str]
     covariance_key: Optional[str] = None
     mixing: Optional[str] = None
     noise_free_mock: bool = False
     ells: Optional[dict[str, Any]] = None
 
     @classmethod
-    def from_dict(cls, data: dict, config_dir: Path) -> PhotoDataConfig:
+    def from_dict(cls, data: dict, config_dir: Path, sdv: bool = False) -> PhotoDataConfig:
         """Build a `PhotoDataConfig` object from the raw ``data`` section of a
         config yaml file.
 
@@ -341,12 +345,15 @@ class PhotoDataConfig:
             The ``data`` section parsed from a config yaml file.
         config_dir: Path
             Directory the config file lives in.
+        sdv: bool
+            Whether the run is in the ``sdv`` mode, where ``covariance`` is
+            optional.
 
         Returns
         -------
         data_config: PhotoDataConfig
         """
-        if "covariance" not in data:
+        if "covariance" not in data and not sdv:
             raise ValueError("'data' section is missing required key 'covariance'")
         if "cells" not in data and "ells" not in data:
             raise ValueError("'data' section needs 'cells', or 'ells' to build the data vector")
@@ -369,7 +376,9 @@ class PhotoDataConfig:
             nz_shear=str(base_directory / nz_shear),
             z_grid=z_grid,
             cells=str(base_directory / data["cells"]) if "cells" in data else None,
-            covariance=str(base_directory / data["covariance"]),
+            covariance=(
+                str(base_directory / data["covariance"]) if "covariance" in data else None
+            ),
             covariance_key=data.get("covariance_key"),
             mixing=str(base_directory / data["mixing"]) if "mixing" in data else None,
             noise_free_mock=bool(data.get("noise_free_mock", False)),
@@ -438,13 +447,15 @@ class RunConfig:
     prune_parameters: bool = False
 
     @classmethod
-    def from_yaml(cls, path: str) -> RunConfig:
+    def from_yaml(cls, path: str, mode: str | None = None) -> RunConfig:
         """Load a config yaml file and build a ``RunConfig`` object out of it.
 
         Parameters
         ----------
         path: str
             Path to the config yaml file.
+        mode: str or None
+            Run mode, see `from_dict`.
 
         Returns
         -------
@@ -455,13 +466,13 @@ class RunConfig:
         raw_text = config_path.read_text()
         return cls.from_dict(
             yaml.safe_load(raw_text), config_dir=config_path.parent,
-            raw_text=raw_text, label=path,
+            raw_text=raw_text, label=path, mode=mode,
         )
 
     @classmethod
     def from_dict(
         cls, raw: dict[str, Any], config_dir: Path, raw_text: str | None = None,
-        label: str = "<dict>",
+        label: str = "<dict>", mode: str | None = None,
     ) -> RunConfig:
         """Build a ``RunConfig`` object from an already parsed config.
 
@@ -475,6 +486,9 @@ class RunConfig:
             Text saved next to the chain; ``raw`` dumped as yaml if ``None``.
         label: str
             Name of the config, used in the error messages.
+        mode: str or None
+            Run mode. With ``sdv``, ``sampler``, ``scale_cuts`` and
+            ``data.covariance`` are optional, as they are not used.
 
         Returns
         -------
@@ -484,7 +498,9 @@ class RunConfig:
         if raw_text is None:
             raw_text = yaml.safe_dump(raw, sort_keys=False)
 
-        missing = [key for key in REQUIRED_SECTIONS if key not in raw]
+        sdv = mode == "sdv"
+        required = SDV_REQUIRED_SECTIONS if sdv else REQUIRED_SECTIONS
+        missing = [key for key in required if key not in raw]
         if missing:
             raise ValueError(
                 f"Config '{label}' is missing required section(s): {missing}"
@@ -492,18 +508,22 @@ class RunConfig:
 
         if "kind" not in raw["probe"]:
             raise ValueError("'probe' section is missing required key 'kind'")
-        if "kind" not in raw["sampler"]:
+        sampler = raw.get("sampler", {})
+        if "kind" not in sampler and not sdv:
             raise ValueError("'sampler' section is missing required key 'kind'")
 
         if raw["probe"]["kind"] in PHOTO_PROBES:
-            data = PhotoDataConfig.from_dict(raw["data"], config_dir=config_dir)
+            data = PhotoDataConfig.from_dict(raw["data"], config_dir=config_dir, sdv=sdv)
             _check_photo_sampled_parameters(raw["sampled_parameters"])
             sampled_parameters = raw["sampled_parameters"]
-            if "scale_cuts" not in raw:
+            if "scale_cuts" in raw:
+                scale_cuts = _parse_photo_scale_cuts(raw["scale_cuts"])
+            elif sdv:
+                scale_cuts = {}
+            else:
                 raise ValueError(
                     f"'scale_cuts' is required for probe '{raw['probe']['kind']}'"
                 )
-            scale_cuts = _parse_photo_scale_cuts(raw["scale_cuts"])
         else:
             data = DataConfig.from_dict(raw["data"], config_dir=config_dir)
             sampled_parameters = _normalize_sampled_parameters(
@@ -522,7 +542,7 @@ class RunConfig:
             scale_cuts=scale_cuts,
             sampled_parameters=sampled_parameters,
             fixed_parameters=raw["fixed_parameters"],
-            sampler=raw["sampler"],
+            sampler=sampler,
             output=raw["output"],
             raw_text=raw_text,
             constraints=raw.get("constraints", {}),

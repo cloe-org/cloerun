@@ -122,7 +122,40 @@ def test_to_run_config_sdv_and_decoupled(tmp_path):
     assert mode == "sdv"
     # The sdv mode writes the data vector, and decoupled runs need no mixing.
     assert "cells" not in raw["data"] and "mixing" not in raw["data"]
-    assert raw["scale_cuts"] == {"WL": [10, 1500], "GGL": [10, 750], "GCph": [10, 750]}
+    # The 'inference' section is not read in the sdv mode.
+    assert "covariance" not in raw["data"]
+    assert "scale_cuts" not in raw and "sampler" not in raw
+    config = RunConfig.from_dict(raw, tmp_path, mode="sdv")
+    assert config.data.covariance is None
+    assert config.scale_cuts == {} and config.sampler == {}
+
+
+def test_to_run_config_sdv_without_inference(tmp_path):
+    pipeline = _pipeline_config()
+    pipeline["run"]["mode"] = "sdv"
+    del pipeline["inference"]
+    raw, mode = to_run_config(pipeline, tmp_path, "run", str(tmp_path))
+    assert mode == "sdv"
+    config = RunConfig.from_dict(raw, tmp_path, mode=mode)
+    assert config.data.ells == {"kind": "log", "ell_min": 10, "ell_max": 1500, "N_ell": 8}
+    # The other modes still need it.
+    with pytest.raises(ValueError, match=r"missing section\(s\) \['inference'\]"):
+        to_run_config(pipeline, tmp_path, "run", str(tmp_path), mode="chain")
+
+
+def test_run_config_sdv_optional_sections(tmp_path):
+    raw, _ = to_run_config(_pipeline_config(), tmp_path, "run", str(tmp_path))
+    del raw["sampler"], raw["scale_cuts"], raw["data"]["covariance"]
+    config = RunConfig.from_dict(raw, tmp_path, mode="sdv")
+    assert config.data.covariance is None
+    with pytest.raises(ValueError, match="missing required section"):
+        RunConfig.from_dict(raw, tmp_path)
+    raw["sampler"] = {"kind": "nautilus"}
+    with pytest.raises(ValueError, match="missing required key 'covariance'"):
+        RunConfig.from_dict(raw, tmp_path)
+    raw["data"]["covariance"] = "cov.npz"
+    with pytest.raises(ValueError, match="'scale_cuts' is required"):
+        RunConfig.from_dict(raw, tmp_path)
 
 
 def test_scale_cuts_from_file(tmp_path):
