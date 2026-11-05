@@ -12,7 +12,7 @@ def _config():
         "modelling": {
             "probe": "WL",
             "parameters": "parameters.yaml",
-            "nz": {"file": "${root_dir}/nz.fits", "zs_max": 3.0},
+            "nz": {"file_she": "${root_dir}/nz.fits", "file_pos": "${root_dir}/nz_pos.fits", "zs_max": 3.0},
             "theory": {"background": "CAMB", "nonlinear_perturbations": "HMcode2020Emu"},
             "coupling": {"mode": "coupled", "mixing_matrices": "${root_dir}/MM.fits"},
             "binning": {"kind": "log", "ell_min": 10, "ell_max": 1500, "N_ell": 8},
@@ -96,7 +96,7 @@ def test_variables_follow_components(tmp_path):
         components={"moved": {"run": {"root_dir": "/elsewhere"}}},
     )
     runs = {r.name: r for r in load_campaign(path)}
-    assert runs["moved"].config["modelling"]["nz"]["file"] == "/elsewhere/nz.fits"
+    assert runs["moved"].config["modelling"]["nz"]["file_she"] == "/elsewhere/nz.fits"
 
 
 def test_dotted_and_ambiguous_keys():

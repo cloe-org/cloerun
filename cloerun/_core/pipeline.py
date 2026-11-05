@@ -333,11 +333,14 @@ def to_run_config(
         "covariance": likelihood["covariance"],
         "noise_free_mock": bool(likelihood.get("noise_free_mock", False)),
     }
-    if "file" in nz:
-        data["nz"] = nz["file"]
-    for key in ("shear", "positions"):
-        if key in nz:
-            data[f"nz_{key}"] = nz[key]
+    # One n(z) file per sample: shear (source) and positions (lens).
+    for key, target in (("file_she", "nz_shear"), ("file_pos", "nz_positions")):
+        if key not in nz:
+            raise ValueError(
+                f"'modelling.nz' is missing '{key}'; it needs both 'file_she' "
+                "(shear sample) and 'file_pos' (positions sample)"
+            )
+        data[target] = nz[key]
     for key, source in (
         # The sdv mode writes the data vector: it does not read one.
         ("cells", likelihood.get("data_vector") if mode != "sdv" else None),
