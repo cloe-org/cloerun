@@ -219,7 +219,7 @@ A pipeline config has three blocks:
   `covariance_key`, `noise_free_mock`), `scale_cuts` (`per_block`, with
   `WL`, `GGL` and `GC`, or `from_file`, a yaml file of one range per
   spectrum), `derived_outputs` (`sigma8_0`, `S8`, stored as chain columns)
-  and `sampler`.
+  and `sampler`. The `sdv` mode does not read it, so it may be left out.
 
 In the parameter file, `value` is fixed, `min start max` is a flat prior and
 `gauss mean sigma` a Gaussian one, with `start` and `mean` the fiducial

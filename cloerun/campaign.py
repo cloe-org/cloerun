@@ -100,7 +100,7 @@ class CampaignRun:
             raw, mode = to_run_config(
                 self.config, self.config_dir, self.name, self.output_dir, mode
             )
-        return RunConfig.from_dict(raw, self.config_dir, label=self.name), mode
+        return RunConfig.from_dict(raw, self.config_dir, label=self.name, mode=mode), mode
 
 
 def _deep_merge(base: Any, update: Any) -> Any:
@@ -354,12 +354,13 @@ def load_runs(
             raw = apply_component(raw, overrides, "--set")
         if output_dir is not None:
             raw["output"] = {**raw["output"], "directory": str(Path(output_dir).resolve())}
+        mode = mode or "chain"
         config = RunConfig.from_dict(
             raw, path.resolve().parent, raw_text=yaml.safe_dump(raw, sort_keys=False),
-            label=str(path),
+            label=str(path), mode=mode,
         )
         campaign_runs = None
-        runs = [(config.output["name"], config, mode or "chain")]
+        runs = [(config.output["name"], config, mode)]
     else:
         campaign_runs = load_campaign(path, output_dir, overrides)
         runs = [(r.name, r, None) for r in campaign_runs]

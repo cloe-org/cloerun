@@ -370,19 +370,21 @@ def build_likelihood(cfg: RunConfig):
 
     if data_cfg.cells is not None:
         cells = el.le3.pk_wl.angular_power_spectra(data_cfg.cells)
-        scale_cuts = _build_scale_cuts(cfg, cells)
-        ells = np.asarray(cells[next(iter(scale_cuts))].ell)
+        prefixes = {PHOTO_BLOCKS[block] for block in _BLOCKS[kind]}
+        ells = np.asarray(next(cells[key] for key in cells if key[:2] in prefixes).ell)
     else:
         ells = binning_ells(data_cfg.ells)
         cells = _template_cells(kind, dndz_pos.shape[0], dndz_she.shape[0], len(ells))
-        scale_cuts = _build_scale_cuts(cfg, cells)
+    # The sdv mode gives no scale cuts nor covariance: cloelike only reads
+    # them in the loglike, not in the theory.
+    scale_cuts = _build_scale_cuts(cfg, cells) if cfg.scale_cuts else None
 
-    sizes = _block_sizes(dndz_pos.shape[0], dndz_she.shape[0], len(ells))
-    covariance = _select_covariance(
-        _load_covariance(data_cfg.covariance, data_cfg.covariance_key), kind, sizes
-    )
-
-    data: dict[str, Any] = {"cells": cells, "ells": ells, "z_arr": z_grid, "cov": covariance}
+    data: dict[str, Any] = {"cells": cells, "ells": ells, "z_arr": z_grid}
+    if data_cfg.covariance is not None:
+        sizes = _block_sizes(dndz_pos.shape[0], dndz_she.shape[0], len(ells))
+        data["cov"] = _select_covariance(
+            _load_covariance(data_cfg.covariance, data_cfg.covariance_key), kind, sizes
+        )
     if uses_pos:
         data["dndz_pos"] = dndz_pos
     if uses_she:
