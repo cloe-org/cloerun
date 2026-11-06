@@ -231,6 +231,12 @@ bias of a WL run) are dropped, so one parameter file serves every probe.
 `sampler.settings.pool` evaluates the likelihood in that many processes; the
 likelihood is rebuilt once in each of them, so this works on macOS too.
 
+With `pool: mpi` the likelihood is evaluated in the workers of an
+`mpi4py.futures.MPIPoolExecutor`, which can span several nodes. Launch with
+`mpirun -n N python -m mpi4py.futures -m cloerun chain config.yaml`: rank 0
+runs the sampler and the other N - 1 ranks evaluate the likelihood, so set
+`n_batch` to a multiple of N - 1.
+
 ## cloerun configs
 
 The pipeline configs are translated into cloerun configs, which can also be

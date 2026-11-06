@@ -13,6 +13,21 @@ from cloerun._core.priors import Priors
 #: Package(s) whose version matters when this sampler is chosen.
 TRACKED_PACKAGES = ("nautilus-sampler",)
 
+#: Log-likelihood of an MPI worker, set once per worker by `_init_worker`.
+_LOGLIKE = None
+
+
+def _init_worker(loglike_fn):
+    """Install the log-likelihood in an MPI worker, so that it is unpickled
+    (and the likelihood rebuilt) once per worker, not once per evaluation."""
+    global _LOGLIKE
+    _LOGLIKE = loglike_fn
+
+
+def _worker_loglike(*args):
+    """Evaluate the log-likelihood installed by `_init_worker`."""
+    return _LOGLIKE(*args)
+
 
 def _build_nautilus_prior(priors: Priors) -> Prior:
     """Translate a sampler-agnostic `Priors` into a `nautilus.Prior`."""
@@ -43,13 +58,29 @@ def run(
     `loglike_fn` returns the log-likelihood followed by `n_derived` derived
     quantities, stored by nautilus as blobs and returned as `derived`, of
     shape `(n_samples, n_derived)` (`None` otherwise).
+
+    With `pool: mpi` the likelihood is evaluated in the workers of an
+    `mpi4py.futures.MPIPoolExecutor`; launch with
+    ``mpirun -n N python -m mpi4py.futures -m cloerun chain config.yaml``
+    (N - 1 workers).
     """
     filepath = sampler_settings.get("filepath")
     if filepath is not None:
         Path(filepath).parent.mkdir(parents=True, exist_ok=True)
+    executor = None
+    if sampler_settings.get("pool") == "mpi":
+        from mpi4py.futures import MPIPoolExecutor
+
+        executor = MPIPoolExecutor(initializer=_init_worker, initargs=(loglike_fn,))
+        sampler_settings = {**sampler_settings, "pool": executor}
+        loglike_fn = _worker_loglike
     prior = _build_nautilus_prior(priors)
     sampler = Sampler(prior, loglike_fn, **sampler_settings)
-    sampler.run(**{"verbose": True, **(run_settings or {})})
+    try:
+        sampler.run(**{"verbose": True, **(run_settings or {})})
+    finally:
+        if executor is not None:
+            executor.shutdown()
     if n_derived == 0:
         points, logweight, loglikelihood = sampler.posterior()
         return points, logweight, loglikelihood, None
