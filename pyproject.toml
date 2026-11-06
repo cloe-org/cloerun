@@ -21,6 +21,8 @@ cloerun = "cloerun.__main__:main"
 [project.optional-dependencies]
 test = ["pytest"]
 analyse = ["getdist", "matplotlib"]
+mpi = ["mpi4py"]
+
 # The cloe-org releases cloerun is tested with.
 cloe = [
     "cloelib @ git+https://github.com/cloe-org/cloelib.git@v0.11",
