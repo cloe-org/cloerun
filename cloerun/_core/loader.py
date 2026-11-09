@@ -67,12 +67,16 @@ BACKGROUNDS: dict[str, str] = {
 PERTURBATIONS: dict[str, str] = {
     "CAMB": "cloelib.cosmology.camb_cosmology:CAMBLinearPerturbations",
     "HMcode2020Emu": "cloelib.cosmology.HMcode2020Emu_cosmology:HMemuLinearPerturbations",
+    "CosmoPowerJAX": "cloelib.cosmology.cosmopower_jax_cosmology:CosmoPowerJAXLCDMPerturbations.Linear",
+    "CosmoPowerJAX_w0wa": "cloelib.cosmology.cosmopower_jax_cosmology:CosmoPowerJAXw0waCDMPerturbations.Linear",
 }
 
 NONLINEAR_PERTURBATIONS: dict[str, str] = {
     "CAMB": "cloelib.cosmology.camb_cosmology:CAMBNonLinearPerturbations",
     "HMcode2020Emu": "cloelib.cosmology.HMcode2020Emu_cosmology:HMemuNonLinearPerturbations",
     "EE2": "cloelib.cosmology.EE2_cosmology:EE2NonLinearPerturbations",
+    "CosmoPowerJAX": "cloelib.cosmology.cosmopower_jax_cosmology:CosmoPowerJAXLCDMPerturbations.NonLinear",
+    "CosmoPowerJAX_w0wa": "cloelib.cosmology.cosmopower_jax_cosmology:CosmoPowerJAXw0waCDMPerturbations.NonLinear",
 }
 
 BARYON_BOOSTS: dict[str, str] = {
@@ -98,7 +102,8 @@ def load_from_path(path: str) -> Any:
     ----------
     path: str
         Dotted path to a module, in the form ``"module.submodule"``, or to an
-        attribute inside a module, in the form ``"module.submodule:attr"``.
+        attribute inside a module, in the form ``"module.submodule:attr"`` or
+        ``"module.submodule:Class.attr"``.
 
     Returns
     -------
@@ -107,7 +112,10 @@ def load_from_path(path: str) -> Any:
     """
     module_name, _, attr_name = path.partition(":")
     module = importlib.import_module(module_name)
-    return getattr(module, attr_name) if attr_name else module
+    obj = module
+    for name in attr_name.split(".") if attr_name else []:
+        obj = getattr(obj, name)
+    return obj
 
 
 def load_probe(kind: str):
