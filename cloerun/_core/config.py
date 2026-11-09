@@ -322,6 +322,12 @@ class PhotoDataConfig:
     ells: dict[str, Any] or None
         Multipole binning used when there is no ``cells`` file, see
         `cloerun._core.probes.photo_cls.binning_ells`.
+    twopcf: str or None
+        Path of the correlation functions file (real-space probes).
+    theta: dict[str, Any] or None
+        Angular binning in arcmin used when there is no ``twopcf`` file.
+    ell_max_integration: int or None
+        Largest multipole of the real-space theory.
     """
 
     nz_positions: str
@@ -333,6 +339,9 @@ class PhotoDataConfig:
     mixing: Optional[str] = None
     noise_free_mock: bool = False
     ells: Optional[dict[str, Any]] = None
+    twopcf: Optional[str] = None
+    theta: Optional[dict[str, Any]] = None
+    ell_max_integration: Optional[int] = None
 
     @classmethod
     def from_dict(cls, data: dict, config_dir: Path, sdv: bool = False) -> PhotoDataConfig:
@@ -355,8 +364,11 @@ class PhotoDataConfig:
         """
         if "covariance" not in data and not sdv:
             raise ValueError("'data' section is missing required key 'covariance'")
-        if "cells" not in data and "ells" not in data:
-            raise ValueError("'data' section needs 'cells', or 'ells' to build the data vector")
+        if not any(key in data for key in ("cells", "ells", "twopcf", "theta")):
+            raise ValueError(
+                "'data' section needs 'cells', or 'ells' to build the data vector "
+                "('twopcf' or 'theta' for the real-space probes)"
+            )
         nz_positions = data.get("nz_positions", data.get("nz"))
         nz_shear = data.get("nz_shear", data.get("nz"))
         if nz_positions is None or nz_shear is None:
@@ -370,6 +382,7 @@ class PhotoDataConfig:
         ells = dict(data["ells"]) if "ells" in data else None
         if ells is not None and "file" in ells:
             ells["file"] = str(base_directory / ells["file"])
+        theta = dict(data["theta"]) if "theta" in data else None
 
         return cls(
             nz_positions=str(base_directory / nz_positions),
@@ -383,6 +396,9 @@ class PhotoDataConfig:
             mixing=str(base_directory / data["mixing"]) if "mixing" in data else None,
             noise_free_mock=bool(data.get("noise_free_mock", False)),
             ells=ells,
+            twopcf=str(base_directory / data["twopcf"]) if "twopcf" in data else None,
+            theta=theta,
+            ell_max_integration=data.get("ell_max_integration"),
         )
 
 

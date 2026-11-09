@@ -27,6 +27,10 @@ Currently supported:
 - **Photometric probes** (angular power spectra,
   `cloelike.EuclidLikelihood_photo_Cls`): `WL` (cosmic shear), `GCph`, `GGL`,
   `2x2pt` (GGL + GCph) and `3x2pt`.
+- **Photometric probes in real space** (two-point correlation functions,
+  `cloelike.EuclidLikelihood_photo_2pcf`): `WL_2pcf`, `GCph_2pcf`,
+  `GGL_2pcf`, `2x2pt_2pcf` and `3x2pt_2pcf`, or `modelling.space: real` in a
+  pipeline config. See `examples/wl_2pcf_nautilus.yaml`.
 - **Spectroscopic probes**: `GCspectro_Pls` (power spectrum multipoles),
   `GCspectro_BAO` (BAO alphas) and `GCspectro_Pls_BAO` (both).
 - **Sampler**: [`nautilus`](https://nautilus-sampler.readthedocs.io/).

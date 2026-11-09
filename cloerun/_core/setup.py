@@ -14,6 +14,7 @@ from cloerun._core.priors import ParameterLayout, Priors, build_priors
 from cloerun._core.templates import expand_bin_templates, prune_unused
 from cloerun._core.loader import (
     DERIVED_PARAMETERS,
+    REAL_SPACE_PROBES,
     load_constraint,
     load_derived_parameter,
     load_probe,
@@ -192,9 +193,10 @@ class Setup:
         priors: Priors
         """
         noise_free_mock = getattr(self.config.data, "noise_free_mock", False)
-        if getattr(self.config.data, "cells", "") is None and not noise_free_mock:
+        data_key = "twopcf" if self.config.probe["kind"] in REAL_SPACE_PROBES else "cells"
+        if getattr(self.config.data, data_key, "") is None and not noise_free_mock:
             raise ValueError(
-                "No data vector: give 'data.cells', or set 'data.noise_free_mock: true'"
+                f"No data vector: give 'data.{data_key}', or set 'data.noise_free_mock: true'"
             )
         data_vector = None
         if noise_free_mock:

@@ -4,6 +4,9 @@ the parameters in a separate file. It is translated into the layout of a
 cloerun config yaml file (see `cloerun._core.config.RunConfig`), so both run
 through the same code.
 
+``modelling.space: real`` selects the real-space likelihood of
+``modelling.probe``, with a theta ``modelling.binning`` in arcmin.
+
 Parameter file
 --------------
 Parameters are grouped in sections (``cosmology``, ``intrinsic_alignment``,
@@ -29,7 +32,7 @@ from typing import Any
 import yaml
 
 from cloerun._core.config import PHOTO_BLOCKS
-from cloerun._core.loader import PHOTO_PROBES
+from cloerun._core.loader import PHOTO_PROBES, REAL_SPACE_PROBES
 
 SECTIONS = ("run", "modelling", "inference")
 # The sdv mode only computes the theory at the fiducial point: it needs no
@@ -197,6 +200,11 @@ def parse_parameters(parameters: dict[str, Any]) -> dict[str, dict[str, Any]]:
     }
 
 
+def _base_probe(probe: str) -> str:
+    """Harmonic-space name of a probe (``3x2pt_2pcf`` -> ``3x2pt``)."""
+    return probe.removesuffix("_2pcf")
+
+
 def _probe_pair_prefixes(probe: str) -> set[tuple[str, str]]:
     """(tracer, tracer) prefixes of the spectra of a probe.
 
@@ -232,7 +240,7 @@ def _scale_cuts(scale_cuts: dict[str, Any], probe: str, config_dir: Path) -> dic
         The cloerun ``scale_cuts`` section.
     """
     kind = scale_cuts.get("kind", "per_block")
-    blocks = _PROBE_BLOCKS[probe]
+    blocks = _PROBE_BLOCKS[_base_probe(probe)]
     per_block = {
         BLOCK_ALIASES.get(block, block): bounds
         for block, bounds in (scale_cuts.get("per_block") or {}).items()
@@ -247,7 +255,7 @@ def _scale_cuts(scale_cuts: dict[str, Any], probe: str, config_dir: Path) -> dic
 
     path = config_dir / scale_cuts["from_file"]
     pairs = yaml.safe_load(path.read_text()) or {}
-    prefixes = _probe_pair_prefixes(probe)
+    prefixes = _probe_pair_prefixes(_base_probe(probe))
     overrides = {
         pair: bounds for pair, bounds in pairs.items()
         if tuple(str(pair).split("-")[:2]) in prefixes
@@ -313,10 +321,16 @@ def to_run_config(
     modelling = config["modelling"]
     inference = {} if sdv else config["inference"]
     probe = modelling.get("probe")
+    space = modelling.get("space", "harmonic")
+    if space not in ("harmonic", "real"):
+        raise ValueError(f"'modelling.space' must be 'harmonic' or 'real', got '{space}'")
+    if space == "real" and probe in PHOTO_PROBES and probe not in REAL_SPACE_PROBES:
+        probe = f"{probe}_2pcf"
     if probe not in PHOTO_PROBES:
         raise ValueError(
             f"'modelling.probe' must be one of {sorted(PHOTO_PROBES)}, got '{probe}'"
         )
+    real_space = probe in REAL_SPACE_PROBES
 
     theory = modelling.get("theory", {})
     systematics = dict(modelling.get("systematics", {}))
@@ -349,15 +363,16 @@ def to_run_config(
             )
         data[target] = nz[key]
     for key, source in (
-        ("cells", likelihood.get("data_vector")),
+        ("twopcf" if real_space else "cells", likelihood.get("data_vector")),
         ("covariance", None if sdv else likelihood["covariance"]),
         ("covariance_key", likelihood.get("covariance_key")),
         ("mixing", coupling.get("mixing_matrices") if probe_section["mode"] == "coupled" else None),
+        ("ell_max_integration", likelihood.get("ell_max_integration") if real_space else None),
     ):
         if source is not None:
             data[key] = source
     if "binning" in modelling:
-        data["ells"] = dict(modelling["binning"])
+        data["theta" if real_space else "ells"] = dict(modelling["binning"])
 
     output = modelling.get("output", {})
     raw = {
