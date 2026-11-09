@@ -15,11 +15,18 @@ PROBES: dict[str, str] = {
     "GGL": "cloerun._core.probes.photo_cls",
     "2x2pt": "cloerun._core.probes.photo_cls",
     "3x2pt": "cloerun._core.probes.photo_cls",
+    "WL_2pcf": "cloerun._core.probes.photo_2pcf",
+    "GCph_2pcf": "cloerun._core.probes.photo_2pcf",
+    "GGL_2pcf": "cloerun._core.probes.photo_2pcf",
+    "2x2pt_2pcf": "cloerun._core.probes.photo_2pcf",
+    "3x2pt_2pcf": "cloerun._core.probes.photo_2pcf",
 }
+
+REAL_SPACE_PROBES = frozenset({"WL_2pcf", "GCph_2pcf", "GGL_2pcf", "2x2pt_2pcf", "3x2pt_2pcf"})
 
 # Probes whose config uses the photometric `data` layout (n(z), angular power
 # spectra, ...) instead of the spectroscopic one (redshifts, multipoles, ...).
-PHOTO_PROBES = frozenset({"WL", "GCph", "GGL", "2x2pt", "3x2pt"})
+PHOTO_PROBES = frozenset({"WL", "GCph", "GGL", "2x2pt", "3x2pt"}) | REAL_SPACE_PROBES
 
 SAMPLERS: dict[str, str] = {
     "nautilus": "cloerun._core.samplers.nautilus_runner",
