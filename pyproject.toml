@@ -7,7 +7,7 @@ name = "cloerun"
 version = "0.1.0"
 description = "Run Euclid inference campaigns (synthetic data, chains, analysis) with cloelike likelihoods"
 readme = "README.md"
-requires-python = ">=3.11,<3.13"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "pyyaml",
     "numpy",
