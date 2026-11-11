@@ -8,6 +8,7 @@ from typing import Any
 
 PROBES: dict[str, str] = {
     "GCspectro_Pls": "cloerun._core.probes.gcspectro_pls",
+    "GCspectro_xils": "cloerun._core.probes.gcspectro_xils",
     "GCspectro_BAO": "cloerun._core.probes.gcspectro_bao",
     "GCspectro_Pls_BAO": "cloerun._core.probes.gcspectro_pls_bao",
     "WL": "cloerun._core.probes.photo_cls",

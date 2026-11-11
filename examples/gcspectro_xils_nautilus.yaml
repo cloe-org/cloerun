@@ -15,7 +15,7 @@ probe:
   # - GCspectro_BAO
   # - GCspectro_Pls_BAO
   # - WL, GCph, GGL, 2x2pt, 3x2pt (photometric, see 3x2pt_nautilus.yaml)
-  kind:       GCspectro_Xils
+  kind:       GCspectro_xils
   # Background class from cloelib.
   # Available options:
   # - CAMB
@@ -37,7 +37,7 @@ data:
   redshifts:      [1.0, 1.2, 1.4, 1.65]
   # Path of the base directory containing the data files, relative to the
   # directory containing this config yaml file.
-  base_directory: ../data
+  base_directory: ../../data
   # Root name of the full-shape power-spectrum-multipoles. These must be
   # written in the corresponding LE3 data model (h/Mpc units).
   datavec_FS:     "mps_xi_GCspectro_z{}.fits"
@@ -47,8 +47,8 @@ data:
   # Root name of the mixing matrix. This must be written in the
   # corresponding LE3 data model (h/Mpc units).
   #
-# Scale cuts for the multipoles in h/Mpc units. These are converted internally
-# to 1/Mpc units using the fiducial H0 (read in the header of the data files).
+# Scale cuts for the multipoles in Mpc/h units. These are converted internally
+# to Mpc units using the fiducial H0 (read in the header of the data files).
 # Keys must match data.redshifts exactly, one entry per bin.
 scale_cuts:
   1.0:  {ell0: [20.0, 200.0], ell2: [20.0, 200.0], ell4: [20.0, 200.0]}
