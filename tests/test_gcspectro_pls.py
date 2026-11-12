@@ -11,7 +11,7 @@ from cloerun._core.probes.gcspectro_pls import (  # noqa: E402
     tracked_packages,
 )
 
-TCM_PARAMS = {"b1": [0.5, 1, 1], "c0": [1, 2, 2]}
+TCM_PARAMS = {"b1": [0.5, 1], "c0": [1, 2]}
 
 
 class _COMET:
