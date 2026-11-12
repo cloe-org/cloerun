@@ -97,6 +97,36 @@ def test_loglikelihood_pickles_without_likelihood(tmp_path):
     assert copy({"a": 0.4}) == pytest.approx((-0.5, 0.4))
 
 
+def _loglikelihood(tmp_path):
+    priors = build_priors({"a": {"dist": "flat", "min": -1.0, "max": 1.0}}, [])
+    return LogLikelihood(
+        _config(tmp_path), {"b_1": 0.0, "b_2": 0.0, "h": 0.7, "omch2": 0.12}, priors.layout,
+        data_vector=np.array([0.5, 0.0]),
+    )
+
+
+@pytest.mark.parametrize("value", [np.nan, np.inf])
+def test_non_finite_loglike_is_a_failed_point(tmp_path, monkeypatch, capsys, value):
+    import toy_probe
+
+    monkeypatch.setattr(toy_probe, "loglike", lambda likelihood, parameters: value)
+    loglike, derived = _loglikelihood(tmp_path)({"a": 0.1})
+    assert loglike == -np.inf and np.isnan(derived)
+    assert "[loglike] non-finite value" in capsys.readouterr().err
+
+
+def test_loglike_error_is_a_failed_point(tmp_path, monkeypatch, capsys):
+    import toy_probe
+
+    def fail(likelihood, parameters):
+        raise ValueError("emulator out of range")
+
+    monkeypatch.setattr(toy_probe, "loglike", fail)
+    loglike, derived = _loglikelihood(tmp_path)({"a": 0.1})
+    assert loglike == -np.inf and np.isnan(derived)
+    assert "[loglike] ValueError: emulator out of range at {'a': 0.1}" in capsys.readouterr().err
+
+
 def test_no_data_vector(tmp_path):
     config = _config(tmp_path)
     config.data.cells = None
