@@ -208,8 +208,8 @@ A pipeline config has three blocks:
   to `modelling.output.file`, to read back as `data_vector`) or `test` -- and
   `root_dir`.
 - **`modelling`**: `probe` (`WL`, `GCph`, `GGL`, `2x2pt`, `3x2pt`),
-  `parameters` (the parameter file), `nz` (`file`, or `shear` and
-  `positions`: FITS, or a text table of z and one column per bin such as the
+  `parameters` (the parameter file), `nz` (`file_she` for the shear
+  sample and `file_pos` for the positions sample: FITS, or a text table of z and one column per bin such as the
   Spaceborne `nz_shear.txt`; `zs_min`, `zs_max`, `zs_num`), `theory`,
   `systematics` (passed to `cloelike` with `settings`), `coupling` (`mode`,
   `mixing_matrices`), `binning` (`kind`: `log`, `linear`, `sqrt`, or
@@ -219,7 +219,7 @@ A pipeline config has three blocks:
   `covariance_key`, `noise_free_mock`), `scale_cuts` (`per_block`, with
   `WL`, `GGL` and `GC`, or `from_file`, a yaml file of one range per
   spectrum), `derived_outputs` (`sigma8_0`, `S8`, stored as chain columns)
-  and `sampler`.
+  and `sampler`. The `sdv` mode does not read it, so it may be left out.
 
 In the parameter file, `value` is fixed, `min start max` is a flat prior and
 `gauss mean sigma` a Gaussian one, with `start` and `mean` the fiducial
