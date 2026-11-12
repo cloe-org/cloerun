@@ -149,9 +149,11 @@ def load_perturbations(name: str):
     Parameters
     ----------
     name: str
-        Linear perturbations name, i.e. the config's ``probe.background`` for
-        the spectroscopic probes (same as the background, as they are tied
-        together) or ``probe.linear_perturbations`` for the photometric ones.
+        Linear perturbations name, i.e. the config's ``probe.perturbations``
+        for the spectroscopic probes (defaulting to ``probe.background``; the
+        two are independently selectable, e.g. ``background: CAMB`` with
+        ``perturbations: HMcode2020Emu``) or ``probe.linear_perturbations``
+        for the photometric ones.
 
     Returns
     -------
