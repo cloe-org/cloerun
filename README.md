@@ -251,9 +251,9 @@ repository:
 | `3x2pt`, `wl` | `nz_example.fits` | [15092862](https://doi.org/10.5281/zenodo.15092862) |
 | `3x2pt`, `wl` | `synthetic_coupled_cells.fits`, `mixmats_example.fits`, `covmat_2D.npz` | [19071608](https://doi.org/10.5281/zenodo.19071608) |
 | `gcspectro_pls`, `gcspectro_pls_bao` | `mps_pk_*`, `cov_pk_Gauss_GCspectro_comet_*`, `mixmat_pk_*` | [18711304](https://doi.org/10.5281/zenodo.18711304) |
-| `gcspectro_xils`, `gcspectro_xils_bao` | `mps_xi_GCspectro_*`, `cov_xi_Gauss_GCspectro_*` | [21026624](https://doi.org/10.5281/zenodo.21026624) |
 | `gcspectro_bao`, `gcspectro_pls_bao` | `EUC_LE3_BAO_*` | [19729182](https://doi.org/10.5281/zenodo.19729182) |
 | `gcspectro_pls_bao` | `cov_pk_Gauss_GCspectro_FS+BAO_*` | [21219969](https://doi.org/10.5281/zenodo.21219969) |
+| `gcspectro_xils`, `gcspectro_xils_bao` | `mps_xi_GCspectro_*`, `cov_xi_Gauss_GCspectro_*` | [21026624](https://doi.org/10.5281/zenodo.21026624) |
 
 For the photometric examples:
 
