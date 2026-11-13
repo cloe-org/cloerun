@@ -12,6 +12,7 @@ probe:
   # Likelihood class to build.
   # Available options:
   # - GCspectro_Pls
+  # - GCspectro_xils
   # - GCspectro_BAO
   # - GCspectro_Pls_BAO
   # - WL, GCph, GGL, 2x2pt, 3x2pt (photometric, see 3x2pt_nautilus.yaml)

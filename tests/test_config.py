@@ -24,6 +24,7 @@ def _photo_raw():
         ("3x2pt_nautilus.yaml", PhotoDataConfig),
         ("wl_nautilus.yaml", PhotoDataConfig),
         ("gcspectro_pls_nautilus.yaml", DataConfig),
+        ("gcspectro_xils_nautilus.yaml", DataConfig),
         ("gcspectro_bao_nautilus.yaml", DataConfig),
         ("gcspectro_pls_bao_nautilus.yaml", DataConfig),
     ],

@@ -14,7 +14,7 @@ output:
 probe:
   # Likelihood class to build.
   # Available options:
-  # - GCspectro_Pls, GCspectro_BAO, GCspectro_Pls_BAO (spectroscopic)
+  # - GCspectro_Pls, GCspectro_xils, GCspectro_BAO, GCspectro_Pls_BAO (spectroscopic)
   # - WL, GCph, GGL, 2x2pt (GGL + GCph), 3x2pt (WL + GGL + GCph) (photometric)
   kind:       3x2pt
   # Background class from cloelib.

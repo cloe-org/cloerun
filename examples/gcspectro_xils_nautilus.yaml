@@ -1,0 +1,119 @@
+# Example of config yaml file for a GCspectro run including full-shape
+# information, using the COMET EFT model, sampled with nautilus.
+
+output:
+  # Path to the directory where the chain will be written, relative to the
+  # working directory. If it doesn't exist, it will be created.
+  directory: chains
+  # Root name of the chain file to write in the output directory. 
+  name:      test_gcspectro_xils_eft
+
+probe:
+  # Likelihood class to build.
+  # Available options:
+  # - GCspectro_Pls
+  # - GCspectro_xils
+  # - GCspectro_BAO
+  # - GCspectro_Pls_BAO
+  # - WL, GCph, GGL, 2x2pt, 3x2pt (photometric, see 3x2pt_nautilus.yaml)
+  kind:       GCspectro_xils
+  # Background class from cloelib.
+  # Available options:
+  # - CAMB
+  background: CAMB
+  spectro_power:
+    # Theory code that computes the power spectrum multipoles.
+    # Available options:
+    # - COMET
+    # - PBJ
+    code:      COMET
+    # RSD model to use in the fit.
+    # Available options:
+    # - EFT (COMET, PBJ)
+    # - VDG (COMET)
+    rsd_model: EFT
+
+data:
+  # Effective redshifts of the spectroscopic bins.
+  redshifts:      [1.0, 1.2, 1.4, 1.65]
+  # Path of the base directory containing the data files, relative to the
+  # directory containing this config yaml file.
+  base_directory: ../../data
+  # Root name of the full-shape power-spectrum-multipoles. These must be
+  # written in the corresponding LE3 data model (h/Mpc units).
+  datavec_FS:     "mps_xi_GCspectro_z{}.fits"
+  # Root name of the covariance matrix. This must be written in the
+  # corresponding LE3 data model (h/Mpc units).
+  covariance:     "cov_xi_Gauss_GCspectro_z{}.fits"
+  # Root name of the mixing matrix. This must be written in the
+  # corresponding LE3 data model (h/Mpc units).
+  #
+# Scale cuts for the multipoles in Mpc/h units. These are converted internally
+# to Mpc units using the fiducial H0 (read in the header of the data files).
+# Keys must match data.redshifts exactly, one entry per bin.
+scale_cuts:
+  1.0:  {ell0: [20.0, 200.0], ell2: [20.0, 200.0], ell4: [20.0, 200.0]}
+  1.2:  {ell0: [20.0, 200.0], ell2: [20.0, 200.0], ell4: [20.0, 200.0]}
+  1.4:  {ell0: [20.0, 200.0], ell2: [20.0, 200.0], ell4: [20.0, 200.0]}
+  1.65:  {ell0: [20.0, 200.0], ell2: [20.0, 200.0], ell4: [20.0, 200.0]}
+
+# Default values that are kept fixed for all samples. Any name also listed under
+# sampled_parameters is overridden per-sample.
+fixed_parameters:
+  Omega_k0: 0.0
+  mnu:      0.0
+  N_mnu:    0
+  w0:       -1.0
+  wa:       0.0
+  gamma_MG: 0.545
+  alpha_s:  0.0
+  fout:    [0.0, 0.0, 0.0, 0.0]
+  sigmaz:  [0.0, 0.0, 0.0, 0.0]
+  NP0:  [0.0, 0.0, 0.0, 0.0]
+  NP20:  [0.0, 0.0, 0.0, 0.0]
+  NP22:  [0.0, 0.0, 0.0, 0.0]
+
+# Sampled parameters, with their prior distributions. Each parameter can be either
+# sampled freely (flat or Gaussian prior) or analytically marginalised (AM) with
+# a Gaussian prior. Per-bin parameters can be specified with a single spec (broadcast
+#to all bins) or with one spec per redshift.
+sampled_parameters:
+  H0:    {dist: flat, min: 50.0, max: 90.0}
+  omch2: {dist: flat, min: 0.08, max: 0.16}
+  ombh2: {dist: norm, loc: 0.0219961, scale: 0.00038}
+  As:    {dist: flat, min: 1.05e-9, max: 2.95e-9}
+  ns:    {dist: norm, loc: 0.96, scale: 0.042}
+  b1:    
+    1.0: {dist: flat, min: 0.25, max: 4.0}
+    1.2: {dist: flat, min: 0.25, max: 4.0}
+    1.4: {dist: flat, min: 0.25, max: 4.0}
+    1.65: {dist: flat, min: 0.25, max: 4.0}
+  b2:    {dist: flat, min: -5.0, max: 5.0}
+  bG2:   {dist: flat, min: -4.0, max: 4.0}
+  bGam3: {dist: AM, loc: 0.0, scale: 5.0}
+  c0:    {dist: AM, loc: 0.0, scale: 250.0}
+  c2:    {dist: AM, loc: 0.0, scale: 250.0}
+  c4:    {dist: AM, loc: 0.0, scale: 250.0}
+  cnlo:  {dist: AM, loc: 0.0, scale: 500.0}
+
+# Relations between parameters that are enforced during the run.
+derived_parameters:
+  bG2_coevolution: true
+  bG2_excursion_set: false
+  bGam3_coevolution: false
+
+# Additional constraints on sampled parameters that are enforced during the run.
+# Any sampled point failing an enabled check is rejected outright (as -inf) before
+# the likelihood is even evaluated.
+constraints:
+  negative_w0_wa_sum: true
+
+sampler:
+  # Type of sampler.
+  # Available options:
+  # - nautilus
+  kind: nautilus
+  # Settings of the sampler and of the run.
+  settings:
+    n_live: 8000
+    filepath: checkpoint.hdf5

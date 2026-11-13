@@ -223,7 +223,7 @@ class DataConfig:
     bao_labels: list[str]
         Corresponding redshift labels, with trailing zeros.
     datavec_FS_template: str or None
-        Full-shape (power-spectrum multipoles) data-vector filename
+        Full-shape (power-spectrum/2PCF multipoles) data-vector filename
         template, resolved to an absolute path, or ``None`` if not
         given in the config.
     datavec_BAO_template: str or None
