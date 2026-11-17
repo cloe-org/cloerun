@@ -1,0 +1,74 @@
+# Example of config yaml file for a real-space cosmic shear (xi_+, xi_-) run.
+# See wl_nautilus.yaml for the harmonic-space one.
+
+output:
+  directory: chains
+  name:      test_wl_2pcf_NLA_HMcode
+
+probe:
+  kind:       WL_2pcf
+  background: CAMB
+  linear_perturbations:    HMcode2020Emu
+  nonlinear_perturbations: HMcode2020Emu
+  baryon_boost: null
+  settings:
+    ia_model: NLA
+    nonlinear_param_keys: [log10TAGN]
+
+data:
+  base_directory: ../data
+  nz:             nz_example.fits
+  z_grid:         {min: 1.0e-4, max: 3.0, num: 100}
+  # LE3 2D TPCF file, or theta with noise_free_mock: true.
+  # twopcf:       synthetic_2pcf.fits
+  theta:          {theta_min: 2.5, theta_max: 250.0, N_theta: 20}
+  covariance:     covmat_2pcf.npz
+  covariance_key: Gauss
+  ell_max_integration: 40000
+  noise_free_mock: true
+
+# Theta ranges in arcmin: xi_+ then xi_-.
+scale_cuts:
+  WL: [2.5, 250.0, 10.0, 250.0]
+
+fixed_parameters:
+  H0:         70.0
+  Omega_cdm0: 0.25
+  Omega_b0:   0.05
+  ns:         0.96
+  As:         2.0e-9
+  w0:         -1.0
+  wa:         0.0
+  Omega_k0:   0.0
+  mnu:        0.06
+  N_mnu:      1
+  gamma_MG:   0.545
+  alpha_s:    0.0
+  AIA:        1.72
+  CIA:        0.0134
+  EtaIA:      -0.41
+  log10TAGN:  7.8
+  multiplicative_bias_{i}: 0.0
+  dz_shear_{i}:            0.0
+  width_shear_{i}:         1.0
+
+sampled_parameters:
+  ombh2: {dist: norm, loc: 0.0245, scale: 0.00038}
+  omch2: {dist: flat, min: 0.11, max: 0.13}
+  logA:  {dist: flat, min: 2.833, max: 3.219}
+  ns:    {dist: flat, min: 0.6, max: 1.2}
+  H0:    {dist: flat, min: 50.0, max: 90.0}
+  AIA:   {dist: flat, min: -5.0, max: 5.0}
+  EtaIA: {dist: flat, min: -5.0, max: 5.0}
+  log10TAGN: {dist: flat, min: 7.6, max: 8.3}
+  multiplicative_bias_{i}: {dist: norm, loc: 0.0, scale: 0.01}
+  dz_shear_{i}:            {dist: norm, loc: 0.0, scale: 0.01}
+
+constraints:
+  negative_w0_wa_sum: true
+
+sampler:
+  kind: nautilus
+  settings:
+    n_live: 2000
+    filepath: checkpoint_wl_2pcf.hdf5

@@ -189,3 +189,25 @@ def test_photo_data_needs_cells_or_ells(tmp_path):
     del raw["data"]["cells"], raw["data"]["ells"]
     with pytest.raises(ValueError, match="needs 'cells', or 'ells'"):
         RunConfig.from_dict(raw, tmp_path)
+
+
+def test_to_run_config_real_space(tmp_path):
+    pipeline = _pipeline_config("3x2pt")
+    pipeline["modelling"]["space"] = "real"
+    pipeline["modelling"]["binning"] = {"theta_min": 2.5, "theta_max": 250.0, "N_theta": 20}
+    pipeline["inference"]["likelihood"]["data_vector"] = "twopcf.fits"
+    pipeline["inference"]["likelihood"]["ell_max_integration"] = 30000
+    pipeline["inference"]["scale_cuts"]["per_block"]["WL"] = [2.5, 250.0, 10.0, 250.0]
+    raw, _ = to_run_config(pipeline, tmp_path, "run", str(tmp_path))
+    config = RunConfig.from_dict(raw, tmp_path)
+    assert config.probe["kind"] == "3x2pt_2pcf"
+    assert config.data.twopcf == str(tmp_path / "twopcf.fits")
+    assert config.data.theta["N_theta"] == 20
+    assert config.data.ell_max_integration == 30000
+    assert "cells" not in raw["data"] and "ells" not in raw["data"]
+    assert config.scale_cuts["WL"] == [2.5, 250.0, 10.0, 250.0]
+    assert config.scale_cuts["GGL"] == [10, 750] and config.scale_cuts["GCph"] == [10, 750]
+    with pytest.raises(ValueError, match="modelling.space"):
+        pipeline["modelling"]["space"] = "fourier"
+        to_run_config(pipeline, tmp_path, "run", str(tmp_path))
+
