@@ -44,11 +44,11 @@ probe:
     # - VDG (COMET)
     rsd_model: EFT
   # Nuisance parameters sampled in the TCM reparametrisation,
-  # p_TCM = p * Aap**n * sigma12**m, as name: [n, m]. Aap is the AP volume
-  # factor with respect to the fiducial cosmology of the data and sigma12
-  # the rms of the linear density field in spheres of radius 12 Mpc, both
-  # at the redshift of the bin. Their priors in sampled_parameters are priors
-  # on p_TCM.
+  # p_TCM = p * Aap**n * sigma12**m * fcorr**q, as name: [n, m] or
+  # name: [n, m, q] (q = 0 if omitted). Aap is the AP volume factor with
+  # respect to the fiducial cosmology of the data and sigma12 the rms of the
+  # linear density field in spheres of radius 12 Mpc, both at the redshift of
+  # the bin. Their priors in sampled_parameters are priors on p_TCM.
   TCM_params:
     b1: [0.5, 1]
     c0: [1, 2]
@@ -92,7 +92,7 @@ fixed_parameters:
   wa:       0.0
   gamma_MG: 0.545
   alpha_s:  0.0
-  fout:    [0.0, 0.0, 0.0, 0.0]
+  fcorr:   [1.0, 1.0, 1.0, 1.0]
   sigmaz:  [0.0, 0.0, 0.0, 0.0]
 
 # Sampled parameters, with their prior distributions. Each parameter can be either
@@ -114,9 +114,6 @@ sampled_parameters:
     1.4:  {dist: flat, min: 0.10595224, max: 1.6952358}
     1.65: {dist: flat, min: 0.096591938, max: 1.545471}
   b2:    {dist: flat, min: -5.0, max: 5.0}
-  # bG2 cannot be derived from b1 when b1 is a TCM parameter (the relations
-  # are applied before the TCM parameters are converted), so it is sampled.
-  bG2:   {dist: flat, min: -4.0, max: 4.0}
   bGam3: {dist: AM, loc: 0.0, scale: 5.0}
   c0:
     1.0:  {dist: AM, loc: 0.0, scale: 62.408941}
@@ -132,10 +129,9 @@ sampled_parameters:
 
 # Values of the sampled parameters used by `cloerun chain --test`; the prior
 # median is used for the ones left out. The point of gcspectro_pls_nautilus.yaml:
-# b1 is its b1 times sigma12 (Aap = 1 at the fiducial cosmology of the data),
-# bG2 the coevolution relation at its b1. Per-bin parameters take one value
-# per bin, in the order of data.redshifts (or one entry per bin, as b1[0],
-# b1[1], ...).
+# b1 is its b1 times sigma12 (Aap = 1 at the fiducial cosmology of the data).
+# Per-bin parameters take one value per bin, in the order of data.redshifts
+# (or one entry per bin, as b1[0], b1[1], ...).
 fiducial_parameters:
   H0:    67.0
   omch2: 0.121203
@@ -144,11 +140,10 @@ fiducial_parameters:
   ns:    0.96
   b1:    [0.69948989, 0.73426885, 0.76285612, 0.7727355]
   b2:    [0.0, 0.0, 0.0, 0.0]
-  bG2:   [-0.11428571, -0.17142857, -0.22857143, -0.28571429]
 
 # Relations between parameters that are enforced during the run.
 derived_parameters:
-  bG2_coevolution: false
+  bG2_coevolution: true
   bG2_excursion_set: false
   bGam3_coevolution: false
 

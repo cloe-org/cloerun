@@ -77,7 +77,7 @@ fixed_parameters:
   wa:       0.0
   gamma_MG: 0.545
   alpha_s:  0.0
-  fout:    [0.0, 0.0, 0.0, 0.0]
+  fcorr:   [1.0, 1.0, 1.0, 1.0]
   sigmaz:  [0.0, 0.0, 0.0, 0.0]
 
 # Sampled parameters, with their prior distributions. Each parameter can be either

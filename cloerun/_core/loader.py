@@ -31,21 +31,13 @@ CONSTRAINTS: dict[str, str] = {
 }
 
 # "trigger": auto-enabled when this parameter is in the config.
-# "inputs", "output": parameters read and set by a bias relation, checked
-# against the sampled and TCM parameters by the config.
+# "outputs": a bias relation, with no "path": applied by the spectroscopic
+# likelihood, which receives its name; it sets the first of "outputs" that the
+# theory code reads (bGam3 for COMET, bG3 for PBJ).
 DERIVED_PARAMETERS: dict[str, dict[str, Any]] = {
-    "bG2_coevolution": {
-        "path": "cloerun._core.derived_parameters:bG2_coevolution",
-        "inputs": ["b1"], "output": "bG2",
-    },
-    "bG2_excursion_set": {
-        "path": "cloerun._core.derived_parameters:bG2_excursion_set",
-        "inputs": ["b1"], "output": "bG2",
-    },
-    "bGam3_coevolution": {
-        "path": "cloerun._core.derived_parameters:bGam3_coevolution",
-        "inputs": ["b1", "bG2"], "output": "bGam3",
-    },
+    "bG2_coevolution": {"outputs": ["bG2"]},
+    "bG2_excursion_set": {"outputs": ["bG2"]},
+    "bGam3_coevolution": {"outputs": ["bGam3", "bG3"]},
     "H0_from_h": {
         "path": "cloerun._core.derived_parameters:H0_from_h", "trigger": "h",
     },
