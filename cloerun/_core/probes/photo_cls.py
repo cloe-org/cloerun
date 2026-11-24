@@ -50,12 +50,14 @@ _BLOCKS = {
 _BARYON_BOOST_PARAMETERS = {
     "HMcode2020": ("log10TAGN",),
     "FLAMINGO": ("fgas_sigma", "Mstar_sigma", "jet_fraction"),
+    "BACCO": ("M_c", "eta", "beta", "M1_z0_cen", "theta_inn"),
 }
 
 _PERTURBATIONS_PACKAGES = {
     "CAMB": "camb",
     "HMcode2020Emu": "HMcode2020Emu",
     "EE2": "euclidemu2",
+    "BACCO": "baccoemu",
 }
 
 

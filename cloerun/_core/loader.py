@@ -73,11 +73,13 @@ NONLINEAR_PERTURBATIONS: dict[str, str] = {
     "CAMB": "cloelib.cosmology.camb_cosmology:CAMBNonLinearPerturbations",
     "HMcode2020Emu": "cloelib.cosmology.HMcode2020Emu_cosmology:HMemuNonLinearPerturbations",
     "EE2": "cloelib.cosmology.EE2_cosmology:EE2NonLinearPerturbations",
+    "BACCO": "cloelib.cosmology.baccoemu_cosmology:BACCOemuNonLinearPerturbations",
 }
 
 BARYON_BOOSTS: dict[str, str] = {
     "HMcode2020": "cloelib.cosmology.HMcode2020Emu_cosmology:HMcode2020BaryonBoostMixin",
     "FLAMINGO": "cloelib.cosmology.FlamingoBaryonResponseEmulator_cosmology:FlamingoBaryonBoostMixin",
+    "BACCO": "cloelib.cosmology.baccoemu_cosmology:BACCOemuBaryonBoostMixin",
 }
 
 SPECTRO_POWERS: dict[str, dict[str, str]] = {
