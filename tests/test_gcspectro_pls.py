@@ -79,6 +79,25 @@ def test_load_perturbations_if_needed_PBJ(loaded, TCM_params):
     assert loaded == ["CAMB"]
 
 
+def test_build_likelihood_passes_bias_relations(monkeypatch):
+    datavec = SimpleNamespace(fiducial_cosmology={"H0": 67.0})
+    monkeypatch.setattr(
+        gcspectro_pls, "_load_raw_data", lambda cfg: {"GCspectro": {"1.": {"datavec": datavec}}}
+    )
+    monkeypatch.setattr(gcspectro_pls, "load_background", lambda name: "Background")
+    monkeypatch.setattr(gcspectro_pls, "load_spectro_power", lambda code, rsd_model: _COMET)
+    monkeypatch.setattr(gcspectro_pls, "EuclidLikelihood_GCspectro_Pls", SimpleNamespace)
+    bias_relations = ["bG2_coevolution", "bGam3_coevolution"]
+    cfg = SimpleNamespace(
+        probe=_probe(),
+        scale_cuts={"1.": {}},
+        data=SimpleNamespace(labels=["1."], num_mocks=None),
+        sampled_parameters={},
+        bias_relations=bias_relations,
+    )
+    assert gcspectro_pls.build_likelihood(cfg).bias_relations == bias_relations
+
+
 @pytest.mark.parametrize("use_Jeffreys", [False, True])
 def test_loglike_AM(use_Jeffreys):
     likelihood = _Likelihood(AM_priors={"1.0": {"c0": [0.0, 1.0]}}, use_Jeffreys=use_Jeffreys)
