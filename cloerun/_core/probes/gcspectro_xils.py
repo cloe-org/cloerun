@@ -161,6 +161,7 @@ def build_likelihood(cfg: RunConfig) -> EuclidLikelihood_GCspectro_xils:
         Background=Background,
         SpectroPower=SpectroPower,
         Perturbations=Perturbations,
+        bias_relations=cfg.bias_relations,
         AM_priors=AM_priors,
         num_mocks=cfg.data.num_mocks,
     )
