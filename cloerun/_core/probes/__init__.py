@@ -1,6 +1,6 @@
 """The probe extension point: one module per supported likelihood class.
 
-Available: `gcspectro_pls`, `gcspectro_bao`, `gcspectro_pls_bao` and
+Available: `gcspectro_pls`, `gcspectro_xils`, `gcspectro_bao`, `gcspectro_pls_bao` and
 `photo_cls` (WL, GCph, GGL, 2x2pt and 3x2pt).
 
 A new probe module must expose `obs_labels(cfg)`, `build_likelihood(cfg)`,

@@ -21,14 +21,13 @@ cloerun = "cloerun.__main__:main"
 [project.optional-dependencies]
 test = ["pytest"]
 analyse = ["getdist", "matplotlib"]
-# The cloe-org releases cloerun is tested with.
 cloe = [
-    "cloelib @ git+https://github.com/cloe-org/cloelib.git@v0.11",
-    "cloelike @ git+https://github.com/cloe-org/cloelike.git@v0.3",
+    "cloelib @ git+https://github.com/cloe-org/cloelib.git@main",
+    "cloelike @ git+https://github.com/cloe-org/cloelike.git@main",
 ]
 
 [tool.hatch.metadata]
-# For the git releases of the `cloe` extra.
+# For the git dependencies of the `cloe` extra.
 allow-direct-references = true
 
 [tool.pytest.ini_options]

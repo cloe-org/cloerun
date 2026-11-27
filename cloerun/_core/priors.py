@@ -49,7 +49,7 @@ class Priors:
     AM_priors: dict[str, dict[str, list[float]]]
         Analytically-marginalised (``dist: AM``) entries of
         `sampled_parameters`, re-keyed by redshift label and ready to pass
-        as `EuclidLikelihood_GCspectro_Pls`'s ``AM_priors`` constructor
+        as `EuclidLikelihood_GCspectro_Pls/xils`'s ``AM_priors`` constructor
         argument -- see `extract_AM_priors`. Empty if none are configured.
     """
 

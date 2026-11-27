@@ -1,0 +1,164 @@
+# Example of config yaml file for a GCspectro run including full-shape
+# information, using the COMET EFT model, with b1 and c0 sampled in the TCM
+# reparametrisation, sampled with nautilus.
+#
+# It is the TCM version of gcspectro_pls_nautilus.yaml: `cloerun chain --test`
+# evaluates the same point as there (see fiducial_parameters), and gives the
+# same loglike up to the constant sum_z log(sigma12**2) from the rescaled AM
+# prior of c0 (see sampled_parameters).
+
+output:
+  # Path to the directory where the chain will be written, relative to the
+  # working directory. If it doesn't exist, it will be created.
+  directory: chains
+  # Root name of the chain file to write in the output directory. 
+  name:      test_gcspectro_pls_tcm_eft
+
+probe:
+  # Likelihood class to build.
+  # Available options:
+  # - GCspectro_Pls
+  # - GCspectro_BAO
+  # - GCspectro_Pls_BAO
+  # - WL, GCph, GGL, 2x2pt, 3x2pt (photometric, see 3x2pt_nautilus.yaml)
+  kind:       GCspectro_Pls
+  # Background class from cloelib.
+  # Available options:
+  # - CAMB
+  background: CAMB
+  # Perturbations class from cloelib, computing sigma12 for the TCM
+  # reparametrisation (and the linear power spectrum for PBJ).
+  # Available options:
+  # - CAMB
+  # - HMcode2020Emu
+  perturbations: CAMB
+  spectro_power:
+    # Theory code that computes the power spectrum multipoles.
+    # Available options:
+    # - COMET
+    # - PBJ
+    code:      COMET
+    # RSD model to use in the fit.
+    # Available options:
+    # - EFT (COMET, PBJ)
+    # - VDG (COMET)
+    rsd_model: EFT
+  # Nuisance parameters sampled in the TCM reparametrisation,
+  # p_TCM = p * Aap**n * sigma12**m * fcorr**q, as name: [n, m] or
+  # name: [n, m, q] (q = 0 if omitted). Aap is the AP volume factor with
+  # respect to the fiducial cosmology of the data and sigma12 the rms of the
+  # linear density field in spheres of radius 12 Mpc, both at the redshift of
+  # the bin. Their priors in sampled_parameters are priors on p_TCM.
+  TCM_params:
+    b1: [0.5, 1]
+    c0: [1, 2]
+
+data:
+  # Effective redshifts of the spectroscopic bins.
+  redshifts:      [1.0, 1.2, 1.4, 1.65]
+  # Path of the base directory containing the data files, relative to the
+  # directory containing this config yaml file.
+  base_directory: ../data
+  # Root name of the full-shape power-spectrum-multipoles. These must be
+  # written in the corresponding LE3 data model (h/Mpc units).
+  datavec_FS:     "mps_pk_GCspectro_comet_EFT_z{}.fits"
+  # Root name of the covariance matrix. This must be written in the
+  # corresponding LE3 data model (h/Mpc units).
+  covariance:     "cov_pk_Gauss_GCspectro_comet_EFT_z{}_2500deg2.fits"
+  # Root name of the mixing matrix. This must be written in the
+  # corresponding LE3 data model (h/Mpc units).
+  mixing:         "mixmat_pk_GCspectro_identity_z{}.fits"
+  # Number of mocks used to estimate the covariance, only for a numerical
+  # (sample) covariance: it applies the Hartlap correction to its inverse.
+  # Leave it out for an analytical covariance.
+  # num_mocks: 1000
+
+# Scale cuts for the multipoles in h/Mpc units. These are converted internally
+# to 1/Mpc units using the fiducial H0 (read in the header of the data files).
+# Keys must match data.redshifts exactly, one entry per bin.
+scale_cuts:
+  1.0:  {ell0: [0.0, 0.20], ell2: [0.0, 0.15], ell4: [0.0, 0.15]}
+  1.2:  {ell0: [0.0, 0.25], ell2: [0.0, 0.20], ell4: [0.0, 0.20]}
+  1.4:  {ell0: [0.0, 0.25], ell2: [0.0, 0.20], ell4: [0.0, 0.20]}
+  1.65: {ell0: [0.0, 0.30], ell2: [0.0, 0.25], ell4: [0.0, 0.25]}
+
+# Default values that are kept fixed for all samples. Any name also listed under
+# sampled_parameters is overridden per-sample.
+fixed_parameters:
+  Omega_k0: 0.0
+  mnu:      0.0
+  N_mnu:    0
+  w0:       -1.0
+  wa:       0.0
+  gamma_MG: 0.545
+  alpha_s:  0.0
+  fcorr:   [1.0, 1.0, 1.0, 1.0]
+  sigmaz:  [0.0, 0.0, 0.0, 0.0]
+
+# Sampled parameters, with their prior distributions. Each parameter can be either
+# sampled freely (flat or Gaussian prior) or analytically marginalised (AM) with
+# a Gaussian prior. Per-bin parameters can be specified with a single spec (broadcast
+#to all bins) or with one spec per redshift.
+sampled_parameters:
+  H0:    {dist: flat, min: 50.0, max: 90.0}
+  omch2: {dist: flat, min: 0.08, max: 0.16}
+  ombh2: {dist: norm, loc: 0.0219961, scale: 0.00038}
+  As:    {dist: flat, min: 1.05e-9, max: 2.95e-9}
+  ns:    {dist: norm, loc: 0.96, scale: 0.042}
+  # TCM parameters: the priors of gcspectro_pls_nautilus.yaml multiplied, bin
+  # by bin, by Aap**n * sigma12**m at the fiducial cosmology of the data,
+  # where Aap = 1: limits of a flat prior, loc and scale of an AM one.
+  b1:
+    1.0:  {dist: flat, min: 0.12490891, max: 1.9985425}
+    1.2:  {dist: flat, min: 0.11472951, max: 1.8356721}
+    1.4:  {dist: flat, min: 0.10595224, max: 1.6952358}
+    1.65: {dist: flat, min: 0.096591938, max: 1.545471}
+  b2:    {dist: flat, min: -5.0, max: 5.0}
+  bGam3: {dist: AM, loc: 0.0, scale: 5.0}
+  c0:
+    1.0:  {dist: AM, loc: 0.0, scale: 62.408941}
+    1.2:  {dist: AM, loc: 0.0, scale: 52.65144}
+    1.4:  {dist: AM, loc: 0.0, scale: 44.903507}
+    1.65: {dist: AM, loc: 0.0, scale: 37.32001}
+  c2:    {dist: AM, loc: 0.0, scale: 250.0}
+  c4:    {dist: AM, loc: 0.0, scale: 250.0}
+  cnlo:  {dist: AM, loc: 0.0, scale: 500.0}
+  NP0:   {dist: AM, loc: 1.0, scale: 2.0}
+  NP20:  {dist: AM, loc: 0.0, scale: 70.0}
+  NP22:  {dist: AM, loc: 0.0, scale: 70.0}
+
+# Values of the sampled parameters used by `cloerun chain --test`; the prior
+# median is used for the ones left out. The point of gcspectro_pls_nautilus.yaml:
+# b1 is its b1 times sigma12 (Aap = 1 at the fiducial cosmology of the data).
+# Per-bin parameters take one value per bin, in the order of data.redshifts
+# (or one entry per bin, as b1[0], b1[1], ...).
+fiducial_parameters:
+  H0:    67.0
+  omch2: 0.121203
+  ombh2: 0.0219961
+  As:    2.1e-9
+  ns:    0.96
+  b1:    [0.69948989, 0.73426885, 0.76285612, 0.7727355]
+  b2:    [0.0, 0.0, 0.0, 0.0]
+
+# Relations between parameters that are enforced during the run.
+derived_parameters:
+  bG2_coevolution: true
+  bG2_excursion_set: false
+  bGam3_coevolution: false
+
+# Additional constraints on sampled parameters that are enforced during the run.
+# Any sampled point failing an enabled check is rejected outright (as -inf) before
+# the likelihood is even evaluated.
+constraints:
+  negative_w0_wa_sum: true
+
+sampler:
+  # Type of sampler.
+  # Available options:
+  # - nautilus
+  kind: nautilus
+  # Settings of the sampler and of the run.
+  settings:
+    n_live: 8000
+    filepath: checkpoint.hdf5

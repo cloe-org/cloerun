@@ -12,6 +12,7 @@ probe:
   # Likelihood class to build.
   # Available options:
   # - GCspectro_Pls
+  # - GCspectro_xils
   # - GCspectro_BAO
   # - GCspectro_Pls_BAO
   # - WL, GCph, GGL, 2x2pt, 3x2pt (photometric, see 3x2pt_nautilus.yaml)
@@ -71,7 +72,7 @@ fixed_parameters:
   wa:       0.0
   gamma_MG: 0.545
   alpha_s:  0.0
-  fout:    [0.0, 0.0, 0.0, 0.0]
+  fcorr:   [1.0, 1.0, 1.0, 1.0]
   sigmaz:  [0.0, 0.0, 0.0, 0.0]
 
 # Sampled parameters, with their prior distributions. Each parameter can be either
@@ -90,7 +91,6 @@ sampled_parameters:
     1.4: {dist: flat, min: 0.25, max: 4.0}
     1.65: {dist: flat, min: 0.25, max: 4.0}
   b2:    {dist: flat, min: -5.0, max: 5.0}
-  bG2:   {dist: flat, min: -4.0, max: 4.0}
   bGam3: {dist: AM, loc: 0.0, scale: 5.0}
   c0:    {dist: AM, loc: 0.0, scale: 250.0}
   c2:    {dist: AM, loc: 0.0, scale: 250.0}
@@ -99,6 +99,19 @@ sampled_parameters:
   NP0:   {dist: AM, loc: 1.0, scale: 2.0}
   NP20:  {dist: AM, loc: 0.0, scale: 70.0}
   NP22:  {dist: AM, loc: 0.0, scale: 70.0}
+
+# Values of the sampled parameters used by `cloerun chain --test`; the prior
+# median is used for the ones left out. The cosmology is the fiducial one of the
+# data files. Per-bin parameters take one value per bin, in the order of
+# data.redshifts (or one entry per bin, as b1[0], b1[1], ...).
+fiducial_parameters:
+  H0:    67.0
+  omch2: 0.121203
+  ombh2: 0.0219961
+  As:    2.1e-9
+  ns:    0.96
+  b1:    [1.4, 1.6, 1.8, 2.0]
+  b2:    [0.0, 0.0, 0.0, 0.0]
 
 # Relations between parameters that are enforced during the run.
 derived_parameters:

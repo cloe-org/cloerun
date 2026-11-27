@@ -8,6 +8,7 @@ from typing import Any
 
 PROBES: dict[str, str] = {
     "GCspectro_Pls": "cloerun._core.probes.gcspectro_pls",
+    "GCspectro_xils": "cloerun._core.probes.gcspectro_xils",
     "GCspectro_BAO": "cloerun._core.probes.gcspectro_bao",
     "GCspectro_Pls_BAO": "cloerun._core.probes.gcspectro_pls_bao",
     "WL": "cloerun._core.probes.photo_cls",
@@ -34,16 +35,14 @@ CONSTRAINTS: dict[str, str] = {
     "negative_w0_wa_sum": "cloerun._core.constraints:w0_wa_negative",
 }
 
-DERIVED_PARAMETERS: dict[str, dict[str, str]] = {
-    "bG2_coevolution": {
-        "path": "cloerun._core.derived_parameters:bG2_coevolution",
-    },
-    "bG2_excursion_set": {
-        "path": "cloerun._core.derived_parameters:bG2_excursion_set",
-    },
-    "bGam3_coevolution": {
-        "path": "cloerun._core.derived_parameters:bGam3_coevolution",
-    },
+# "trigger": auto-enabled when this parameter is in the config.
+# "outputs": a bias relation, with no "path": applied by the spectroscopic
+# likelihood, which receives its name; it sets the first of "outputs" that the
+# theory code reads (bGam3 for COMET, bG3 for PBJ).
+DERIVED_PARAMETERS: dict[str, dict[str, Any]] = {
+    "bG2_coevolution": {"outputs": ["bG2"]},
+    "bG2_excursion_set": {"outputs": ["bG2"]},
+    "bGam3_coevolution": {"outputs": ["bGam3", "bG3"]},
     "H0_from_h": {
         "path": "cloerun._core.derived_parameters:H0_from_h", "trigger": "h",
     },
@@ -71,11 +70,13 @@ NONLINEAR_PERTURBATIONS: dict[str, str] = {
     "CAMB": "cloelib.cosmology.camb_cosmology:CAMBNonLinearPerturbations",
     "HMcode2020Emu": "cloelib.cosmology.HMcode2020Emu_cosmology:HMemuNonLinearPerturbations",
     "EE2": "cloelib.cosmology.EE2_cosmology:EE2NonLinearPerturbations",
+    "BACCO": "cloelib.cosmology.baccoemu_cosmology:BACCOemuNonLinearPerturbations",
 }
 
 BARYON_BOOSTS: dict[str, str] = {
     "HMcode2020": "cloelib.cosmology.HMcode2020Emu_cosmology:HMcode2020BaryonBoostMixin",
     "FLAMINGO": "cloelib.cosmology.FlamingoBaryonResponseEmulator_cosmology:FlamingoBaryonBoostMixin",
+    "BACCO": "cloelib.cosmology.baccoemu_cosmology:BACCOemuBaryonBoostMixin",
 }
 
 SPECTRO_POWERS: dict[str, dict[str, str]] = {
@@ -154,9 +155,11 @@ def load_perturbations(name: str):
     Parameters
     ----------
     name: str
-        Linear perturbations name, i.e. the config's ``probe.background`` for
-        the spectroscopic probes (same as the background, as they are tied
-        together) or ``probe.linear_perturbations`` for the photometric ones.
+        Linear perturbations name, i.e. the config's ``probe.perturbations``
+        for the spectroscopic probes (defaulting to ``probe.background``; the
+        two are independently selectable, e.g. ``background: CAMB`` with
+        ``perturbations: HMcode2020Emu``) or ``probe.linear_perturbations``
+        for the photometric ones.
 
     Returns
     -------

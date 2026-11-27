@@ -3,6 +3,7 @@ log-likelihood handed to the samplers."""
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -76,7 +77,8 @@ class LogLikelihood:
 
     def parameters(self, flat_sample: dict[str, float]) -> dict[str, Any]:
         """Full parameter dictionary of one flat sampler point, derived
-        parameters included.
+        parameters included (except the bias relations, applied by the
+        likelihood).
 
         Parameters
         ----------
@@ -91,7 +93,7 @@ class LogLikelihood:
             flat_sample, self.layout, self.fixed_parameters
         )
         for name, enabled in self.config.derived_parameters.items():
-            if enabled:
+            if enabled and "path" in DERIVED_PARAMETERS[name]:
                 load_derived_parameter(name)(parameters)
         return parameters
 
@@ -111,7 +113,13 @@ class LogLikelihood:
                 return failed
         try:
             loglike = self.probe.loglike(self.likelihood, parameters)
-        except (ValueError, RuntimeError):
+        except (ValueError, RuntimeError) as error:
+            print(f"[loglike] {type(error).__name__}: {error} at {flat_sample}",
+                  file=sys.stderr, flush=True)
+            return failed
+        if not np.isfinite(loglike):
+            print(f"[loglike] non-finite value {loglike} at {flat_sample}",
+                  file=sys.stderr, flush=True)
             return failed
         if not derived_names:
             return loglike
@@ -141,8 +149,9 @@ def _fiducial_point(
     # A relation is applied only if its input is part of the point: a config
     # may give the fiducial in the native parameters (Omega_cdm0, As, ...).
     for name, enabled in config.derived_parameters.items():
-        trigger = DERIVED_PARAMETERS[name].get("trigger")
-        if enabled and (trigger is None or trigger in parameters):
+        relation = DERIVED_PARAMETERS[name]
+        trigger = relation.get("trigger")
+        if enabled and "path" in relation and (trigger is None or trigger in parameters):
             load_derived_parameter(name)(parameters)
     return parameters
 

@@ -199,6 +199,38 @@ def _normalize_sampled_parameters(sampled_parameters: dict[str, Any], data: Data
     return normalized
 
 
+def _normalize_fiducial_parameters(
+    fiducial_parameters: dict[str, Any], data: DataConfig
+) -> dict[str, Any]:
+    """Expand the per-bin lists of ``fiducial_parameters`` into one entry
+    per bin, ``name[i]``, the names of the sampled parameters.
+
+    Parameters
+    ----------
+    fiducial_parameters: dict[str, Any]
+        The raw ``fiducial_parameters`` section.
+    data: DataConfig
+        The data setup, for the number of bins.
+
+    Returns
+    -------
+    normalized: dict[str, Any]
+        The section with each list replaced by its per-bin entries.
+    """
+    normalized = {}
+    for name, value in fiducial_parameters.items():
+        if not isinstance(value, list):
+            normalized[name] = value
+            continue
+        if len(value) != len(data.redshifts):
+            raise ValueError(
+                f"'fiducial_parameters.{name}' has {len(value)} values, "
+                f"one per bin expected ({len(data.redshifts)})"
+            )
+        normalized.update({f"{name}[{i}]": v for i, v in enumerate(value)})
+    return normalized
+
+
 def _auto_enable_derived_parameters(
     derived_parameters: dict[str, bool],
     fixed_parameters: dict[str, Any],
@@ -230,6 +262,45 @@ def _auto_enable_derived_parameters(
     return {**auto_enabled, **derived_parameters}
 
 
+def _check_derived_parameters(
+    derived_parameters: dict[str, bool], sampled_parameters: dict[str, Any]
+) -> None:
+    """Check that the enabled bias relations do not clash with the sampled
+    parameters or each other.
+
+    A relation overwrites its output, so the output cannot be sampled
+    (flat or AM) or set by another relation.
+
+    Parameters
+    ----------
+    derived_parameters: dict[str, bool]
+        The resolved ``derived_parameters`` section.
+    sampled_parameters: dict[str, Any]
+        The resolved ``sampled_parameters`` section.
+
+    Raises
+    ------
+    ValueError
+        If an enabled relation clashes with them.
+    """
+    set_by = {}
+    for name, enabled in derived_parameters.items():
+        relation = DERIVED_PARAMETERS.get(name, {})
+        if not enabled or "outputs" not in relation:
+            continue
+        for output in relation["outputs"]:
+            if output in set_by:
+                raise ValueError(
+                    f"'derived_parameters' {set_by[output]} and {name} both set '{output}'"
+                )
+            set_by[output] = name
+            if output in sampled_parameters:
+                raise ValueError(
+                    f"'{output}' is set by the derived parameter '{name}': remove it "
+                    "from 'sampled_parameters'"
+                )
+
+
 @dataclass
 class DataConfig:
     """Container for data setup.
@@ -243,7 +314,7 @@ class DataConfig:
     bao_labels: list[str]
         Corresponding redshift labels, with trailing zeros.
     datavec_FS_template: str or None
-        Full-shape (power-spectrum multipoles) data-vector filename
+        Full-shape (power-spectrum/2PCF multipoles) data-vector filename
         template, resolved to an absolute path, or ``None`` if not
         given in the config.
     datavec_BAO_template: str or None
@@ -446,7 +517,8 @@ class RunConfig:
     fiducial_parameters: dict[str, Any]
         The ``fiducial_parameters`` section: values of the sampled parameters
         at the fiducial point, used with ``fixed_parameters`` by the ``sdv``
-        and ``test`` modes.
+        and ``test`` modes. For the spectroscopic probes, a per-bin list is
+        expanded into one entry per bin, ``name[i]``.
     prune_parameters: bool
         Whether to drop the parameters the likelihood does not read, instead
         of failing on them -- for parameter files shared by several probes.
@@ -465,6 +537,15 @@ class RunConfig:
     derived_outputs: list[str] = field(default_factory=list)
     fiducial_parameters: dict[str, Any] = field(default_factory=dict)
     prune_parameters: bool = False
+
+    @property
+    def bias_relations(self) -> list[str]:
+        """Enabled bias relations, applied by the spectroscopic likelihood."""
+        return [
+            name
+            for name, enabled in self.derived_parameters.items()
+            if enabled and "path" not in DERIVED_PARAMETERS[name]
+        ]
 
     @classmethod
     def from_yaml(cls, path: str, mode: str | None = None) -> RunConfig:
@@ -532,6 +613,7 @@ class RunConfig:
         if "kind" not in sampler and not sdv:
             raise ValueError("'sampler' section is missing required key 'kind'")
 
+        fiducial_parameters = raw.get("fiducial_parameters", {})
         if raw["probe"]["kind"] in PHOTO_PROBES:
             data = PhotoDataConfig.from_dict(raw["data"], config_dir=config_dir, sdv=sdv)
             _check_photo_sampled_parameters(raw["sampled_parameters"])
@@ -550,12 +632,14 @@ class RunConfig:
             sampled_parameters = _normalize_sampled_parameters(
                 raw["sampled_parameters"], data
             )
+            fiducial_parameters = _normalize_fiducial_parameters(fiducial_parameters, data)
             scale_cuts = (
                 _parse_scale_cuts(raw["scale_cuts"], data) if "scale_cuts" in raw else {}
             )
         derived_parameters = _auto_enable_derived_parameters(
             raw.get("derived_parameters", {}), raw["fixed_parameters"], sampled_parameters
         )
+        _check_derived_parameters(derived_parameters, sampled_parameters)
 
         return cls(
             probe=raw["probe"],
@@ -569,6 +653,6 @@ class RunConfig:
             constraints=raw.get("constraints", {}),
             derived_parameters=derived_parameters,
             derived_outputs=list(raw.get("derived_outputs", [])),
-            fiducial_parameters=raw.get("fiducial_parameters", {}),
+            fiducial_parameters=fiducial_parameters,
             prune_parameters=bool(raw.get("prune_parameters", False)),
         )
