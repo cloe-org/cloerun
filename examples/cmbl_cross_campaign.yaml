@@ -1,0 +1,29 @@
+output_dir: chains
+output_name: cmbl_likelihoods
+
+runs:
+  - name: CMBLxWL
+    base: cmbl_cross.yaml
+    components: [cmblxwl, checkpoints]
+  - name: CMBLxGC
+    base: cmbl_cross.yaml
+    components: [cmblxgc, checkpoints]
+  - name: CMBLx
+    base: cmbl_cross.yaml
+    components: [cmblx, checkpoints]
+  - name: 5x2pt
+    base: cmbl_cross.yaml
+    components: [fivex2pt, checkpoints]
+
+components:
+  cmblxwl:
+    probe.kind: CMBLxWL
+  cmblxgc:
+    probe.kind: CMBLxGC
+  cmblx:
+    probe.kind: CMBLx
+  fivex2pt:
+    probe.kind: 5x2pt
+  checkpoints:
+    sampler.settings:
+      filepath: ${output_dir}/${name}.hdf5

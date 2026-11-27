@@ -15,11 +15,16 @@ PROBES: dict[str, str] = {
     "GGL": "cloerun._core.probes.photo_cls",
     "2x2pt": "cloerun._core.probes.photo_cls",
     "3x2pt": "cloerun._core.probes.photo_cls",
+    "CMBLxWL": "cloerun._core.probes.cmbl_cross",
+    "CMBLxGC": "cloerun._core.probes.cmbl_cross",
+    "CMBLx": "cloerun._core.probes.cmbl_cross",
+    "5x2pt": "cloerun._core.probes.cmbl_cross",
 }
 
 # Probes whose config uses the photometric `data` layout (n(z), angular power
 # spectra, ...) instead of the spectroscopic one (redshifts, multipoles, ...).
-PHOTO_PROBES = frozenset({"WL", "GCph", "GGL", "2x2pt", "3x2pt"})
+CMBL_PROBES = frozenset({"CMBLxWL", "CMBLxGC", "CMBLx", "5x2pt"})
+PHOTO_PROBES = frozenset({"WL", "GCph", "GGL", "2x2pt", "3x2pt"}) | CMBL_PROBES
 
 SAMPLERS: dict[str, str] = {
     "nautilus": "cloerun._core.samplers.nautilus_runner",

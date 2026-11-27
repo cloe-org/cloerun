@@ -8,7 +8,7 @@ from typing import Any, Optional
 
 import yaml
 
-from cloerun._core.loader import DERIVED_PARAMETERS, PHOTO_PROBES
+from cloerun._core.loader import DERIVED_PARAMETERS, PHOTO_PROBES, CMBL_PROBES
 
 REQUIRED_SECTIONS = (
     "probe", "data", "fixed_parameters", "sampled_parameters", "sampler", "output",
@@ -88,8 +88,24 @@ PHOTO_BLOCKS = {
     "GCph": ("POS", "POS"),
 }
 
+CMBL_BLOCKS = {
+    "CMBLxWL": ("CMBL", "SHE"),
+    "CMBLxGC": ("CMBL", "POS"),
+    **PHOTO_BLOCKS,
+}
 
-def _parse_photo_scale_cuts(scale_cuts: dict[str, Any]) -> dict[str, Any]:
+# Blocks of each probe, in the order cloelike concatenates them in the data
+# vector (set by the MRO of the likelihood classes).
+_BLOCKS = {
+    "CMBLxWL": ("CMBLxWL",),
+    "CMBLxGC": ("CMBLxGC",),
+    "CMBLx": ("CMBLxWL", "CMBLxGC"),
+    "5x2pt": ("CMBLxWL", "CMBLxGC", "WL", "GGL", "GCph"),
+}
+
+def _parse_photo_scale_cuts(
+    scale_cuts: dict[str, Any], blocks: dict[str, tuple] = PHOTO_BLOCKS
+) -> dict[str, Any]:
     """Validate the photometric ``scale_cuts`` section and parse the keys of
     its per-pair ``overrides``.
 
@@ -101,6 +117,10 @@ def _parse_photo_scale_cuts(scale_cuts: dict[str, Any]) -> dict[str, Any]:
         per-pair ranges under ``overrides``, keyed as ``"POS-SHE-1-3"``. A
         block range may be ``null`` if ``overrides`` covers every spectrum
         of the block.
+    blocks: dict[str, tuple]
+        Blocks the probe may have, mapped to the (tracer, tracer) prefix of
+        their data keys: `PHOTO_BLOCKS`, or `CMBL_BLOCKS` for the CMB lensing
+        cross-correlations.
 
     Returns
     -------
@@ -108,11 +128,11 @@ def _parse_photo_scale_cuts(scale_cuts: dict[str, Any]) -> dict[str, Any]:
         Same section, with the ``overrides`` keys turned into data keys,
         e.g. ``("POS", "SHE", 1, 3)``.
     """
-    unexpected = sorted(set(scale_cuts) - set(PHOTO_BLOCKS) - {"overrides"})
+    unexpected = sorted(set(scale_cuts) - set(blocks) - {"overrides"})
     if unexpected:
         raise ValueError(
             f"Unexpected 'scale_cuts' key(s) {unexpected}; expected any of "
-            f"{sorted(PHOTO_BLOCKS)} and 'overrides'"
+            f"{sorted(blocks)} and 'overrides'"
         )
     parsed = {
         block: None if bounds is None else list(bounds)
@@ -121,15 +141,15 @@ def _parse_photo_scale_cuts(scale_cuts: dict[str, Any]) -> dict[str, Any]:
     overrides = {}
     for pair, bounds in scale_cuts.get("overrides", {}).items():
         parts = str(pair).split("-")
-        if len(parts) != 4 or tuple(parts[:2]) not in PHOTO_BLOCKS.values():
+        if len(parts) != 4 or tuple(parts[:2]) not in blocks.values():
             raise ValueError(
-                f"Invalid 'scale_cuts.overrides' key '{pair}'; expected e.g. "
-                "'SHE-SHE-1-2', 'POS-SHE-1-3' or 'POS-POS-2-2'"
+                f"Invalid 'scale_cuts.overrides' key '{pair}'; expected a "
+                f"'<tracer>-<tracer>-<bin>-<bin>' key with a prefix among "
+                f"{sorted(set(blocks.values()))}"
             )
         overrides[(parts[0], parts[1], int(parts[2]), int(parts[3]))] = list(bounds)
     parsed["overrides"] = overrides
     return parsed
-
 
 def _check_photo_sampled_parameters(sampled_parameters: dict[str, Any]) -> None:
     """Raise an error for sampled-parameter specs the photometric probes do
@@ -517,7 +537,8 @@ class RunConfig:
             _check_photo_sampled_parameters(raw["sampled_parameters"])
             sampled_parameters = raw["sampled_parameters"]
             if "scale_cuts" in raw:
-                scale_cuts = _parse_photo_scale_cuts(raw["scale_cuts"])
+                blocks = CMBL_BLOCKS if raw["probe"]["kind"] in CMBL_PROBES else PHOTO_BLOCKS
+                scale_cuts = _parse_photo_scale_cuts(raw["scale_cuts"], blocks)
             elif sdv:
                 scale_cuts = {}
             else:

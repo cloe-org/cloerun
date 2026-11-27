@@ -1,0 +1,100 @@
+prune_parameters: true
+
+output:
+  directory: chains
+  name: test_5x2pt
+
+probe:
+  kind: 5x2pt
+  background: CAMB
+  linear_perturbations: HMcode2020Emu
+  nonlinear_perturbations: HMcode2020Emu
+  baryon_boost: null
+  mode: decoupled
+  settings:
+    ia_model: NLA
+    galaxy_bias_model: nonlinear
+    include_rsd: false
+    nonlinear_param_keys: [log10TAGN]
+
+data:
+  base_directory: ../data
+  nz_positions: nz_positions.txt
+  nz_shear: nz_shear.txt
+  z_grid: {min: 0.005, max: 5.995, num: 600}
+  cells: cmbx_cells.fits
+  covariance: cmbx_cov.npz
+  covariance_key: cov
+  noise_free_mock: false
+
+scale_cuts:
+  WL:   [10, 1500]
+  GGL:  [10, 750]
+  GCph: [10, 750]
+  CMBLxWL: [10, 1500]
+  CMBLxGC: [10, 750]
+
+fixed_parameters:
+  H0:         70.0
+  Omega_cdm0: 0.25
+  Omega_b0:   0.05
+  ns:         0.96
+  As:         2.0e-9
+  w0:         -1.0
+  wa:         0.0
+  Omega_k0:   0.0
+  mnu:        0.06
+  N_mnu:      1
+  gamma_MG:   0.545
+  alpha_s:    0.0
+  # Intrinsic alignments (TATT)
+  AIA:        1.72
+  CIA:        0.0134
+  EtaIA:      -0.41
+  A2IA:       0.0
+  Eta2IA:     0.0
+  bTA:        0.0
+  z0IA:       0.62
+  # Baryonic feedback
+  log10TAGN:  7.8
+  # Galaxy bias (nonlinear). bs2, b3nl and bk2 are left out, which drops them
+  # from the expansion.
+  b1_photo_nl_bin{i}: 1.0
+  b2_photo_nl_bin{i}: 0.0
+  # Magnification bias, photo-z shifts and widths, multiplicative bias
+  magnification_bias_{i}:  0.0
+  dz_pos_{i}:              0.0
+  width_pos_{i}:           1.0
+  multiplicative_bias_{i}: 0.0
+  dz_shear_{i}:            0.0
+  width_shear_{i}:         1.0
+
+sampled_parameters:
+  ombh2: {dist: norm, loc: 0.0245, scale: 0.00038}
+  omch2: {dist: flat, min: 0.05, max: 0.2}
+  logA:  {dist: flat, min: 2., max: 3.5}
+  ns:    {dist: flat, min: 0.6, max: 1.2}
+  H0:    {dist: flat, min: 50.0, max: 90.0}
+  # Intrinsic alignments
+  AIA:   {dist: flat, min: -5.0, max: 5.0}
+  EtaIA: {dist: flat, min: -5.0, max: 5.0}
+  #A2IA:  {dist: flat, min: -5.0, max: 5.0}
+  #bTA:   {dist: flat, min: -5.0, max: 5.0}
+  # Galaxy bias
+  b1_photo_nl_bin{i}: {dist: flat, min: 0.0, max: 3.0}
+  #b2_photo_nl_bin{i}: {dist: flat, min: -5.0, max: 5.0}
+  # Baryonic feedback
+  log10TAGN: {dist: flat, min: 7.6, max: 8.3}
+  # Magnification bias
+  magnification_bias_{i}: {dist: flat, min: -2.0, max: 2.0}
+  # Photo-z shifts and multiplicative bias
+  #dz_pos_{i}:              {dist: norm, loc: 0.0, scale: 0.01}
+  #multiplicative_bias_{i}: {dist: norm, loc: 0.0, scale: 0.01}
+  #dz_shear_{i}:            {dist: norm, loc: 0.0, scale: 0.01}
+
+derived_outputs: [sigma8_0, S8]
+
+sampler:
+  kind: nautilus
+  settings:
+    n_live: 400
